@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>A Visual Tour through Incremental Stability — Bhabani Shankar Dey</title>
-<meta name="description" content="A visual tour through incremental stability: live, plug-and-play demos of contraction (matrix measures) and incremental Lyapunov functions (δ-GAS and δ-ISS) on linear, nonlinear and switched systems.">
+<meta name="description" content="A visual tour through incremental stability: live, plug-and-play demos of contraction (matrix measures), incremental Lyapunov functions (δ-GAS and δ-ISS) and 2-contraction for systems with multiple equilibria.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap">
 <style>
@@ -60,7 +60,7 @@ canvas{display:block;width:100%;border-radius:8px;background:#fff;touch-action:m
 .eq{font-family:'IBM Plex Mono',monospace;font-size:14px;background:var(--soft);border-radius:8px;padding:12px 14px;margin:10px 0;overflow-x:auto;white-space:nowrap}
 footer{border-top:1px solid var(--line);margin-top:56px}
 footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:var(--muted)}
-.tour{margin-top:28px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
+.tour{margin:28px 0 0;padding:0;max-width:none;align-items:stretch;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
 .tour a{display:flex;flex-direction:column;gap:4px;padding:16px 18px;border:1px solid var(--line);border-radius:10px;text-decoration:none;color:var(--ink)}
 .tour a:hover{border-color:var(--accent)}
 .tour b{font-weight:600}
@@ -98,10 +98,14 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
 <main>
 <span class="kicker">Interactive · plug and play</span>
 <h1>A visual tour through incremental stability</h1>
-<p class="lede">Classical stability asks whether trajectories reach an equilibrium. Incremental stability asks something stronger: do any two trajectories forget where they started and converge to each other? This tour shows two ways to certify it, live in your browser. Pick a system, move the sliders, and watch the certificate succeed or fail.</p>
+<p class="lede">Classical stability asks whether trajectories reach one particular equilibrium. Incremental stability asks how trajectories behave relative to each other: a system ẋ = f(x, t) is incrementally stable if any two of its solutions approach each other, whatever their initial conditions,</p>
+<div class="eq" style="max-width:780px;margin:14px 0">‖x(t) − x̂(t)‖ ≤ β(‖x(0) − x̂(0)‖, t),   β → 0 as t → ∞</div>
+<p class="lede">The system then forgets its initial condition: its long-term behaviour depends only on the input it receives. No equilibrium needs to be known in advance, so the same property covers tracking a moving reference, observer design (the estimate converges to the true state), synchronisation of coupled systems and entrainment to periodic inputs. When two copies receive different inputs, incremental input-to-state stability (δ-ISS) bounds the distance between them by the difference of the inputs, which is how a model and its real counterpart can be kept close in Sim2Real transfer.</p>
+<p class="lede" style="margin-top:12px">This tour shows three ways to reason about it, live in your browser. Pick a system, move the sliders, and watch the certificate succeed or fail.</p>
 <nav class="tour" aria-label="Stops on the tour">
 <a href="#stop-contraction"><span class="mono" style="color:var(--accent)">Stop 1</span><b>Contraction and matrix measures</b><span>Certify convergence from the Jacobian, with a metric you choose.</span></a>
 <a href="#stop-lyapunov"><span class="mono" style="color:var(--accent)">Stop 2</span><b>Incremental Lyapunov functions</b><span>Build V(x, x̂), watch it decay along pairs of trajectories, and see the δ-ISS bound when inputs differ.</span></a>
+<a href="#stop-2contraction"><span class="mono" style="color:var(--accent)">Stop 3</span><b>2-contraction</b><span>When there are several equilibria, distances cannot shrink, but areas can. Watch a patch of initial conditions split and still collapse.</span></a>
 </nav>
 
 <section class="stop" id="stop-contraction" aria-labelledby="h-stop1">
@@ -324,6 +328,98 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
 <p><strong>Local, not global.</strong> For the pendulum, cos x₁ changes sign beyond |x₁| = π/2, so no constant P works everywhere. Shrink the box r to find where V is a valid certificate.</p>
 <p><strong>δ-ISS.</strong> Raise δu: the pair stops converging but stays inside the green bound, which scales linearly with δu.</p>
 <p><strong>In 3D.</strong> The pair is a ball sliding down the bowl V(δ). With a valid certificate it only goes down; with P = I on the linear system, watch it climb (red) before it falls.</p>
+</div>
+</div>
+</section>
+
+<section class="stop" id="stop-2contraction" aria-labelledby="h-stop3">
+<span class="kicker">Stop 3</span>
+<h2 id="h-stop3">2-contraction: when areas shrink but distances don't</h2>
+<p>A system with two stable equilibria cannot be contracting: two trajectories that settle at different equilibria never come together. 2-contraction asks for less. Instead of distances between points, it asks that the area of every small patch of initial conditions shrinks. For a planar system the test is the second additive compound of the Jacobian, which in two dimensions is simply its trace, the divergence of f. If it is negative everywhere, every bounded trajectory converges to an equilibrium and there can be no periodic orbits, while several equilibria are still allowed.</p>
+
+<div class="lab" aria-label="2-contraction demo">
+<form class="panel" onsubmit="return false">
+<div class="row">
+<label class="label" for="ksys">System</label>
+<select id="ksys">
+<option value="duff">Bistable Duffing oscillator</option>
+<option value="toggle">Genetic toggle switch</option>
+<option value="vdp">Van der Pol oscillator</option>
+</select>
+</div>
+<div class="row" id="kparams"></div>
+<div class="slider">
+<label for="krad">Radius of the patch</label><output id="kradO">0.40</output>
+<input id="krad" type="range" min="0.1" max="1" step="0.02" value="0.4">
+</div>
+<label class="check"><input type="checkbox" id="kmap" checked> Show where tr J &lt; 0</label>
+<div class="btns">
+<button type="button" class="btn primary" id="kplay">Pause</button>
+<button type="button" class="btn" id="kreset">Reset patch</button>
+</div>
+<p class="note" id="khint"></p>
+</form>
+
+<div class="stage">
+<div class="card">
+<div class="pipe">
+<div><span class="label nt">1 · Nonlinear system ẋ = f(x)</span><div class="eq" id="keqn"></div></div>
+<div><span class="label nt">2 · Jacobian J = ∂f/∂x</span><div class="eq" id="kjsym"></div></div>
+<div class="step3"><span class="label nt">3 · Second additive compound J^[2] at a point (for n = 2 it is tr J)</span><div class="eq" id="kjnum" aria-live="polite"></div><span class="small" id="kpt"></span></div>
+</div>
+</div>
+<div class="card">
+<div class="plothead">
+<span class="label nt">4 · Where is tr J &lt; 0? Hover to probe, click to move the patch</span>
+<span class="mono" id="kclock" style="font-size:13px;color:var(--muted)">t = 0.00</span>
+</div>
+<canvas id="kphase" height="520" aria-label="Phase plane with equilibria, trajectories, a patch of initial conditions being carried by the flow, and a map of the sign of the trace of the Jacobian"></canvas>
+<div class="legend" style="margin-top:8px"><span><i style="background:rgba(11,92,173,.35)"></i>tr J &lt; 0: areas shrink here</span><span><i style="background:rgba(180,35,24,.35)"></i>tr J ≥ 0: areas may grow</span><span><i style="background:#0F6E5C"></i>patch of initial conditions (dashed: where it started)</span><span>● stable · ○ unstable · ✕ saddle equilibrium</span></div>
+</div>
+<div class="plots">
+<div class="card">
+<div class="plothead"><span class="label nt">Area of the patch</span></div>
+<canvas id="karea" height="240" aria-label="Log plot of the area of the patch over time with the 2-contraction bound"></canvas>
+<div class="legend" style="margin-top:8px"><span><i style="background:#0F6E5C"></i>area(t) / area(0), from ∫ tr J along each point</span><span><i style="background:#C2410C"></i>bound e^{ct}, c = sup tr J</span></div>
+</div>
+<div class="card" style="display:flex;flex-direction:column;gap:12px">
+<span class="label nt">5 · Certificate over the shown region</span>
+<div class="stats">
+<div class="stat sel"><span class="label">sup tr J · 2-contraction</span><span class="v" id="ktr">—</span></div>
+<div class="stat"><span class="label">sup μ₂(J) · contraction</span><span class="v" id="kmu">—</span></div>
+<div class="stat"><span class="label">equilibria · stable</span><span class="v" id="keq">—</span></div>
+<div class="stat"><span class="label">observed area rate</span><span class="v" id="kemp">—</span></div>
+</div>
+<div class="verdict" id="kverdict" aria-live="polite"></div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="theory" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))" aria-label="Background on 2-contraction">
+<div>
+<h2>From contraction to k-contraction</h2>
+<p>Contraction says the flow shrinks lengths: μ(J) &lt; 0. A system is <strong>k-contracting</strong> if the flow shrinks the volume of every k-dimensional parallelotope, which is tested with the k-th additive compound of the Jacobian:</p>
+<div class="eq">μ(J^[k](x)) ≤ −η &lt; 0  for all x</div>
+<p>For k = 1 this is ordinary contraction. For k = 2 it is a statement about areas.</p>
+</div>
+<div>
+<h2>The second additive compound</h2>
+<p>For a 2 × 2 Jacobian, J^[2] is the scalar tr J = ∂f₁/∂x₁ + ∂f₂/∂x₂, so 2-contraction is a sign condition on the divergence. For n = 3 it is the 3 × 3 matrix</p>
+<div class="eq" style="white-space:pre">J^[2] = ⎡ j₁₁+j₂₂   j₂₃      −j₁₃    ⎤
+        ⎢ j₃₂      j₁₁+j₃₃   j₁₂    ⎥
+        ⎣ −j₃₁     j₂₁      j₂₂+j₃₃ ⎦</div>
+</div>
+<div>
+<h2>Why it matters</h2>
+<p>A 2-contracting system cannot have a non-trivial periodic orbit, and every bounded trajectory converges to an equilibrium, of which there may be several (Muldowney; Li and Muldowney). That makes 2-contraction a natural tool for multistable systems such as genetic switches, neural networks and power systems. Combining it with Poincaré-index arguments, as in our IJCAS paper on systems with multiple equilibria, also says how many equilibria can exist and of which type.</p>
+</div>
+<div>
+<h2>Things to try</h2>
+<p><strong>Split but shrink.</strong> In the Duffing oscillator the patch starts on the boundary between the two wells. Its points go to different equilibria, so contraction fails (μ₂(J) &gt; 0), yet the area decays exactly like e^{−dt}.</p>
+<p><strong>Lose it.</strong> Make the damping d negative: tr J = −d &gt; 0 and areas grow.</p>
+<p><strong>Toggle switch.</strong> tr J = −2 for every parameter value, so the switch is always 2-contracting. Raise the cooperativity n to create two stable states and watch the patch choose between them.</p>
+<p><strong>Limit cycle.</strong> Van der Pol has tr J = μ(1 − x₁²) &gt; 0 near the origin, and indeed it has a periodic orbit, which no 2-contracting system can have.</p>
 </div>
 </div>
 </section>
@@ -1034,6 +1130,224 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
   window.addEventListener('resize', draw);
 
   buildParams(); setP(0, 1); run(true); requestAnimationFrame(loop);
+})();
+</script>
+<script>
+/* Stop 3: 2-contraction. For n = 2 the second additive compound J^[2] is tr J. */
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var SYS = {
+    duff: {
+      eq: 'ẋ₁ = x₂\nẋ₂ = k x₁ − x₁³ − d x₂', box: [-2, 2, -1.6, 1.6], T: 9, c0: [0.02, 0.15],
+      params: [{ k: 'k', label: 'stiffness k', min: -1, max: 2, step: 0.05, v: 1 }, { k: 'd', label: 'damping d', min: -0.4, max: 2, step: 0.02, v: 0.5 }],
+      f: function (x, y, p) { return [y, p.k * x - x * x * x - p.d * y]; },
+      J: function (x, y, p) { return [[0, 1], [p.k - 3 * x * x, -p.d]]; },
+      jsym: 'J = ⎡ 0           1  ⎤\n    ⎣ k − 3x₁²   −d  ⎦\ntr J = −d  (constant)',
+      hint: 'Two wells at x₁ = ±√k and a saddle between them. tr J = −d everywhere, so for d > 0 the system is 2-contracting even though points of the patch end up in different wells.'
+    },
+    toggle: {
+      eq: 'ẋ₁ = a / (1 + x₂ⁿ) − x₁\nẋ₂ = a / (1 + x₁ⁿ) − x₂', box: [-0.2, 4.6, -0.2, 4.6], T: 10, c0: [1.55, 1.75],
+      params: [{ k: 'a', label: 'promoter strength a', min: 0.5, max: 4.5, step: 0.05, v: 3 }, { k: 'n', label: 'cooperativity n', min: 1, max: 4, step: 0.1, v: 3 }],
+      f: function (x, y, p) { return [p.a / (1 + Math.pow(Math.max(y, 0), p.n)) - x, p.a / (1 + Math.pow(Math.max(x, 0), p.n)) - y]; },
+      J: function (x, y, p) {
+        var dy = y > 0 ? -p.a * p.n * Math.pow(y, p.n - 1) / Math.pow(1 + Math.pow(y, p.n), 2) : 0;
+        var dx = x > 0 ? -p.a * p.n * Math.pow(x, p.n - 1) / Math.pow(1 + Math.pow(x, p.n), 2) : 0;
+        return [[-1, dy], [dx, -1]];
+      },
+      jsym: 'J = ⎡ −1                    −a n x₂ⁿ⁻¹/(1+x₂ⁿ)² ⎤\n    ⎣ −a n x₁ⁿ⁻¹/(1+x₁ⁿ)²   −1                  ⎦\ntr J = −2  (for every a, n)',
+      hint: 'Two repressors that switch each other off. tr J = −2 always, so the switch is 2-contracting for every parameter value: it can never oscillate. With n ≥ 2 and a large enough it is bistable.'
+    },
+    vdp: {
+      eq: 'ẋ₁ = x₂\nẋ₂ = μ(1 − x₁²) x₂ − x₁', box: [-3, 3, -3.2, 3.2], T: 14, c0: [0.3, 0],
+      params: [{ k: 'mu', label: 'μ', min: -1, max: 2.5, step: 0.05, v: 1 }],
+      f: function (x, y, p) { return [y, p.mu * (1 - x * x) * y - x]; },
+      J: function (x, y, p) { return [[0, 1], [-2 * p.mu * x * y - 1, p.mu * (1 - x * x)]]; },
+      jsym: 'J = ⎡ 0              1          ⎤\n    ⎣ −2μx₁x₂ − 1   μ(1 − x₁²) ⎦\ntr J = μ(1 − x₁²)',
+      hint: 'tr J = μ(1 − x₁²) is positive in the strip |x₁| < 1, so the test fails, as it must: the oscillator has a limit cycle, and a 2-contracting system has no periodic orbits.'
+    }
+  };
+  var DT = 0.01, NP = 700;
+  var st = { sys: 'duff', p: {}, rad: 0.4, c: null, map: true, playing: true, frame: 0, hover: null, blob: null, area: null, traj: [], eqs: [], sup: null, mu: null, emp: null };
+
+  function mu2(A) { var a = A[0][0], b = A[0][1], c = A[1][0], d = A[1][1], m = (b + c) / 2; return (a + d) / 2 + Math.sqrt(((a - d) / 2) * ((a - d) / 2) + m * m); }
+  function tr(A) { return A[0][0] + A[1][1]; }
+  function rk(S, x, y) {
+    var p = st.p, k1 = S.f(x, y, p), k2 = S.f(x + DT / 2 * k1[0], y + DT / 2 * k1[1], p), k3 = S.f(x + DT / 2 * k2[0], y + DT / 2 * k2[1], p), k4 = S.f(x + DT * k3[0], y + DT * k3[1], p);
+    return [x + DT / 6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]), y + DT / 6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1])];
+  }
+
+  function buildParams() {
+    var S = SYS[st.sys], box = $('kparams'); box.innerHTML = ''; st.p = {};
+    S.params.forEach(function (q) {
+      st.p[q.k] = q.v;
+      var w = document.createElement('div'); w.className = 'slider'; var id = 'kq_' + q.k;
+      w.innerHTML = '<label for="' + id + '">' + q.label + '</label><output id="' + id + 'o">' + q.v.toFixed(2) + '</output><input id="' + id + '" type="range" min="' + q.min + '" max="' + q.max + '" step="' + q.step + '" value="' + q.v + '">';
+      box.appendChild(w);
+      w.querySelector('input').addEventListener('input', function (e) { st.p[q.k] = parseFloat(e.target.value); $(id + 'o').textContent = st.p[q.k].toFixed(2); run(false); });
+    });
+    $('keqn').textContent = S.eq; $('kjsym').textContent = S.jsym; $('khint').textContent = S.hint;
+    st.c = S.c0.slice();
+  }
+
+  function equilibria() {
+    var S = SYS[st.sys], b = S.box, out = [];
+    for (var i = 0; i < 9; i++) for (var j = 0; j < 9; j++) {
+      var x = b[0] + (b[1] - b[0]) * (i + 0.5) / 9, y = b[2] + (b[3] - b[2]) * (j + 0.5) / 9;
+      for (var it = 0; it < 40; it++) {
+        var f = S.f(x, y, st.p), J = S.J(x, y, st.p), det = J[0][0] * J[1][1] - J[0][1] * J[1][0];
+        if (Math.abs(det) < 1e-12) break;
+        var dx = (J[1][1] * f[0] - J[0][1] * f[1]) / det, dy = (-J[1][0] * f[0] + J[0][0] * f[1]) / det;
+        x -= dx; y -= dy; if (!isFinite(x) || !isFinite(y)) break;
+      }
+      var r = S.f(x, y, st.p);
+      if (isFinite(x) && Math.hypot(r[0], r[1]) < 1e-8 && x >= b[0] && x <= b[1] && y >= b[2] && y <= b[3] && !out.some(function (e) { return Math.hypot(e.x - x, e.y - y) < 1e-4; })) {
+        var Je = S.J(x, y, st.p), T = tr(Je), D = Je[0][0] * Je[1][1] - Je[0][1] * Je[1][0];
+        out.push({ x: x, y: y, type: D < 0 ? 'saddle' : (T < 0 ? 'stable' : 'unstable') });
+      }
+    }
+    return out;
+  }
+
+  function run(reset) {
+    var S = SYS[st.sys], n = Math.round(S.T / DT), b = S.box;
+    st.eqs = equilibria();
+    /* the patch: NP points filling a disc (sunflower pattern). Each carries l = ∫ tr J dt along its path,
+       so by Liouville's formula area(t) = (A0 / NP) Σ exp(l_i(t)) exactly, however much the patch stretches or splits. */
+    var sx = (b[1] - b[0]) / 4, sy = (b[3] - b[2]) / 4, sc = Math.min(sx, sy), R0 = st.rad * sc;
+    st.R0 = R0; st.blob = []; st.area = new Float64Array(n + 1);
+    var pts = [], ell = new Float64Array(NP), gold = Math.PI * (3 - Math.sqrt(5));
+    for (var m = 0; m < NP; m++) { var rr = R0 * Math.sqrt((m + 0.5) / NP), th = m * gold; pts.push([st.c[0] + rr * Math.cos(th), st.c[1] + rr * Math.sin(th)]); }
+    for (var k = 0; k <= n; k++) {
+      if (k % 3 === 0) st.blob[k / 3] = pts.map(function (q) { return q.slice(); });
+      var A = 0; for (var m2 = 0; m2 < NP; m2++) A += Math.exp(ell[m2]); st.area[k] = A / NP;
+      if (k < n) pts = pts.map(function (q, idx) {
+        var t0 = tr(S.J(q[0], q[1], st.p)), q2 = rk(S, q[0], q[1]);
+        if (!isFinite(q2[0]) || !isFinite(q2[1]) || Math.abs(q2[0]) > 1e3 || Math.abs(q2[1]) > 1e3) return q;
+        ell[idx] += DT * (t0 + tr(S.J(q2[0], q2[1], st.p))) / 2; return q2;
+      });
+    }
+    /* background trajectories from a grid */
+    st.traj = [];
+    for (var i = 0; i < 5; i++) for (var j = 0; j < 5; j++) {
+      var x = b[0] + (b[1] - b[0]) * (i + 0.5) / 5 + (j % 2) * 0.07, y = b[2] + (b[3] - b[2]) * (j + 0.5) / 5, tr0 = [[x, y]];
+      for (var k2 = 0; k2 < n; k2 += 1) { var q2 = rk(S, x, y); x = q2[0]; y = q2[1]; if (!isFinite(x) || Math.abs(x) > 50 || Math.abs(y) > 50) break; if (k2 % 4 === 3) tr0.push([x, y]); }
+      st.traj.push(tr0);
+    }
+    var h = Math.floor(n / 2), a1 = st.area[h], a2 = st.area[n];
+    st.emp = a1 > 0 && a2 > 0 ? Math.log(a2 / a1) / (S.T - h * DT) : null;
+    certify();
+    if (reset) st.frame = 0; if (!st.playing) st.frame = n;
+    draw();
+  }
+
+  function certify() {
+    var S = SYS[st.sys], b = S.box, N = 41, sup = -Infinity, smu = -Infinity;
+    for (var i = 0; i < N; i++) for (var j = 0; j < N; j++) {
+      var J = S.J(b[0] + (b[1] - b[0]) * i / (N - 1), b[2] + (b[3] - b[2]) * j / (N - 1), st.p);
+      sup = Math.max(sup, tr(J)); smu = Math.max(smu, mu2(J));
+    }
+    st.sup = sup; st.mu = smu;
+    var fmt = function (v) { return (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2); };
+    $('ktr').textContent = fmt(sup); $('kmu').textContent = fmt(smu);
+    var ns = st.eqs.filter(function (e) { return e.type === 'stable'; }).length;
+    $('keq').textContent = st.eqs.length + ' · ' + ns;
+    $('kemp').textContent = st.emp === null ? '—' : fmt(st.emp);
+    var v = $('kverdict');
+    if (sup < 0) {
+      v.className = 'verdict ok';
+      v.textContent = '2-contracting on the shown region: tr J ≤ ' + fmt(sup) + ', so areas shrink at least like e^{' + fmt(sup) + 't}. No periodic orbits; bounded trajectories converge to equilibria' +
+        (smu >= 0 ? '. Ordinary contraction fails here (μ₂(J) reaches ' + fmt(smu) + ')' + (ns > 1 ? ', as it must with ' + ns + ' stable equilibria.' : '.') : ', and the system is even contracting (μ₂(J) < 0).');
+    } else {
+      v.className = 'verdict no';
+      v.textContent = 'Not certified: tr J reaches ' + fmt(sup) + ', so areas can grow somewhere in the region' + (st.sys === 'vdp' && st.p.mu > 0 ? '. The limit cycle you see is exactly what 2-contraction would rule out.' : '.');
+    }
+  }
+
+  function setup(cv, ratio) {
+    var dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = Math.round(w * ratio);
+    if (cv.id === 'kphase' && window.innerWidth < 640) h = Math.round(w * 0.95);
+    cv.style.height = h + 'px'; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    var ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx: ctx, w: w, h: h };
+  }
+
+  function probe(x, y) {
+    var S = SYS[st.sys], J = S.J(x, y, st.p), t = tr(J), m = mu2(J);
+    var f2 = function (v) { var s0 = (v < 0 ? '−' : ' ') + Math.abs(v).toFixed(2); return ('       ' + s0).slice(-7); };
+    $('kjnum').textContent = 'J = ⎡' + f2(J[0][0]) + f2(J[0][1]) + ' ⎤\n    ⎣' + f2(J[1][0]) + f2(J[1][1]) + ' ⎦\nJ^[2] = tr J = ' + (t < 0 ? '−' : '+') + Math.abs(t).toFixed(3) + (t < 0 ? '  ✓' : '  ✗') + '\nμ₂(J)        = ' + (m < 0 ? '−' : '+') + Math.abs(m).toFixed(3) + (m < 0 ? '  ✓' : '  ✗');
+    $('kjnum').style.background = t < 0 ? '#E7F4F0' : '#FDECEA';
+    $('kpt').textContent = (st.hover ? 'Hovered point' : 'Centre of the patch') + ' (x₁, x₂) = (' + x.toFixed(2) + ', ' + y.toFixed(2) + '). ✓ marks a test that holds at this point: tr J < 0 means areas shrink here, μ₂(J) < 0 would mean distances shrink too.';
+  }
+
+  function draw() {
+    var S = SYS[st.sys], b = S.box, n = Math.round(S.T / DT), k = Math.min(st.frame, n), t = k * DT;
+    $('kclock').textContent = 't = ' + t.toFixed(2);
+    var P = setup($('kphase'), 0.72), ctx = P.ctx, W = P.w, H = P.h;
+    var cxm = (b[0] + b[1]) / 2, cym = (b[2] + b[3]) / 2, hx = (b[1] - b[0]) / 2, hy = (b[3] - b[2]) / 2;
+    if (hx / hy < W / H) hx = hy * W / H; else hy = hx * H / W;
+    var X = function (x) { return (x - cxm + hx) / (2 * hx) * W; }, Y = function (y) { return H - (y - cym + hy) / (2 * hy) * H; };
+    var iX = function (px) { return cxm - hx + px / W * 2 * hx; }, iY = function (py) { return cym + hy - py / H * 2 * hy; };
+    ctx.clearRect(0, 0, W, H);
+    if (st.map) {
+      var G = 44, cw = W / G, rows = Math.ceil(H / cw);
+      for (var i = 0; i < G; i++) for (var j = 0; j < rows; j++) {
+        var v = tr(S.J(iX((i + 0.5) * cw), iY((j + 0.5) * cw), st.p)), al = Math.min(0.3, 0.07 + Math.abs(v) * 0.06);
+        ctx.fillStyle = v < 0 ? 'rgba(11,92,173,' + al + ')' : 'rgba(180,35,24,' + al + ')'; ctx.fillRect(i * cw, j * cw, cw + 0.5, cw + 0.5);
+      }
+    }
+    ctx.strokeStyle = '#D5DAE0'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, Y(0)); ctx.lineTo(W, Y(0)); ctx.moveTo(X(0), 0); ctx.lineTo(X(0), H); ctx.stroke();
+    var Gv = 17; ctx.strokeStyle = 'rgba(90,98,112,.5)';
+    for (var a = 0; a < Gv; a++) for (var c = 0; c < Gv; c++) {
+      var vx = iX((a + 0.5) * W / Gv), vy = iY((c + 0.5) * H / Gv), f = S.f(vx, vy, st.p), nn = Math.hypot(f[0], f[1]); if (nn < 1e-9) continue;
+      var L = Math.min(W, H) / Gv * 0.34, ux = f[0] / nn, uy = f[1] / nn;
+      ctx.beginPath(); ctx.moveTo(X(vx) - ux * L, Y(vy) + uy * L); ctx.lineTo(X(vx) + ux * L, Y(vy) - uy * L); ctx.stroke();
+      ctx.beginPath(); ctx.arc(X(vx) + ux * L, Y(vy) - uy * L, 1.6, 0, 2 * Math.PI); ctx.fillStyle = 'rgba(90,98,112,.65)'; ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(20,24,31,.28)'; ctx.lineWidth = 1.2;
+    st.traj.forEach(function (tr0) { ctx.beginPath(); tr0.forEach(function (q, i2) { if (i2 === 0) ctx.moveTo(X(q[0]), Y(q[1])); else ctx.lineTo(X(q[0]), Y(q[1])); }); ctx.stroke(); });
+    /* patch: initial outline, current filled shape */
+    ctx.save(); ctx.setLineDash([5, 4]); ctx.strokeStyle = 'rgba(15,110,92,.7)'; ctx.lineWidth = 2; ctx.beginPath();
+    for (var m3 = 0; m3 <= 80; m3++) { var th3 = m3 / 80 * 2 * Math.PI, px = st.c[0] + st.R0 * Math.cos(th3), py = st.c[1] + st.R0 * Math.sin(th3); if (m3 === 0) ctx.moveTo(X(px), Y(py)); else ctx.lineTo(X(px), Y(py)); }
+    ctx.stroke(); ctx.restore();
+    ctx.fillStyle = 'rgba(15,110,92,.75)';
+    st.blob[Math.floor(k / 3)].forEach(function (q) { ctx.fillRect(X(q[0]) - 1.3, Y(q[1]) - 1.3, 2.6, 2.6); });
+    st.eqs.forEach(function (e) {
+      var ex = X(e.x), ey = Y(e.y); ctx.lineWidth = 2.2; ctx.strokeStyle = '#14181F';
+      if (e.type === 'saddle') { ctx.beginPath(); ctx.moveTo(ex - 6, ey - 6); ctx.lineTo(ex + 6, ey + 6); ctx.moveTo(ex + 6, ey - 6); ctx.lineTo(ex - 6, ey + 6); ctx.stroke(); }
+      else { ctx.beginPath(); ctx.arc(ex, ey, 6, 0, 2 * Math.PI); ctx.fillStyle = e.type === 'stable' ? '#14181F' : '#FFFFFF'; ctx.fill(); ctx.stroke(); }
+    });
+    var pr = st.hover || st.c; probe(pr[0], pr[1]);
+    if (st.hover) { ctx.strokeStyle = '#14181F'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(pr[0]), Y(pr[1]), 7, 0, 2 * Math.PI); ctx.stroke(); }
+    st.view = { iX: iX, iY: iY };
+    drawArea(k, n);
+  }
+
+  function drawArea(k, n) {
+    var S = SYS[st.sys], P = setup($('karea'), 0.6), ctx = P.ctx, W = P.w, H = P.h;
+    var padL = 44, padB = 26, padT = 10, padR = 10, lo = -6, hi = 2;
+    var X = function (t) { return padL + t / S.T * (W - padL - padR); }, Y = function (v) { v = Math.max(lo, Math.min(hi, v)); return padT + (hi - v) / (hi - lo) * (H - padT - padB); };
+    ctx.clearRect(0, 0, W, H); ctx.font = '11px "IBM Plex Mono", monospace'; ctx.fillStyle = '#5A6270'; ctx.strokeStyle = '#E3E6EA'; ctx.lineWidth = 1;
+    for (var e = lo; e <= hi; e += 2) { ctx.beginPath(); ctx.moveTo(padL, Y(e)); ctx.lineTo(W - padR, Y(e)); ctx.stroke(); ctx.fillText('1e' + e, 4, Y(e) + 4); }
+    for (var tt = 0; tt <= S.T; tt += 2) ctx.fillText(String(tt), X(tt) - 4, H - 8);
+    var A0 = st.area[0]; ctx.strokeStyle = '#0F6E5C'; ctx.lineWidth = 3.5; ctx.beginPath();
+    for (var q = 0; q <= k; q += 4) { var r = st.area[q] / A0, v = r > 0 && isFinite(r) ? Math.log10(r) : hi; if (q === 0) ctx.moveTo(X(q * DT), Y(v)); else ctx.lineTo(X(q * DT), Y(v)); }
+    ctx.stroke();
+    if (st.sup !== null) { ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#C2410C'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(S.T), Y(st.sup * S.T / Math.LN10)); ctx.stroke(); ctx.restore(); }
+  }
+
+  function visible() { var a = $('kphase').getBoundingClientRect(), b2 = $('karea').getBoundingClientRect(); return b2.bottom > -200 && a.top < window.innerHeight + 200; }
+  function loop() { var n = Math.round(SYS[st.sys].T / DT); if (st.playing && visible()) { st.frame += 3; if (st.frame > n + 120) st.frame = 0; draw(); } requestAnimationFrame(loop); }
+
+  $('ksys').addEventListener('change', function (e) { st.sys = e.target.value; buildParams(); run(true); });
+  $('krad').addEventListener('input', function (e) { st.rad = parseFloat(e.target.value); $('kradO').textContent = st.rad.toFixed(2); run(true); });
+  $('kmap').addEventListener('change', function (e) { st.map = e.target.checked; draw(); });
+  $('kplay').addEventListener('click', function () { st.playing = !st.playing; this.textContent = st.playing ? 'Pause' : 'Play'; if (!st.playing) { st.frame = Math.round(SYS[st.sys].T / DT); draw(); } });
+  $('kreset').addEventListener('click', function () { st.c = SYS[st.sys].c0.slice(); run(true); });
+  $('kphase').addEventListener('click', function (e) { if (!st.view) return; var r = this.getBoundingClientRect(); st.c = [st.view.iX(e.clientX - r.left), st.view.iY(e.clientY - r.top)]; run(true); });
+  $('kphase').addEventListener('mousemove', function (e) { if (!st.view) return; var r = this.getBoundingClientRect(); st.hover = [st.view.iX(e.clientX - r.left), st.view.iY(e.clientY - r.top)]; if (!st.playing) draw(); });
+  $('kphase').addEventListener('mouseleave', function () { st.hover = null; if (!st.playing) draw(); });
+  window.addEventListener('resize', draw);
+
+  buildParams(); run(true); requestAnimationFrame(loop);
 })();
 </script>
 </body>
