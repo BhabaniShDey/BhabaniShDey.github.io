@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Visual Tour through Incremental Stability — Bhabani Shankar Dey</title>
+<meta name="description" content="A visual tour through incremental stability: live, plug-and-play demos of contraction (matrix measures) and incremental Lyapunov functions (δ-GAS and δ-ISS) on linear, nonlinear and switched systems.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+:root{--ink:#14181F;--ink2:#3D4552;--muted:#5A6270;--line:#E3E6EA;--soft:#F6F7F9;--accent:#0B5CAD;--good:#0F6E5C;--bad:#B42318}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:#FFFFFF;color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:16px;line-height:1.55}
+a{color:var(--accent)}a:hover{color:#083F78}
+.mono{font-family:'IBM Plex Mono',monospace}
+header{border-bottom:1px solid var(--line)}
+nav{max-width:1160px;margin:0 auto;padding:18px 24px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 32px}
+nav .brand{text-decoration:none;color:var(--ink);font-weight:600;font-size:17px}
+nav .links{display:flex;flex-wrap:wrap;gap:4px 22px;font-size:15px}
+nav .links a{color:var(--ink2);text-decoration:none;padding:10px 0}
+main{max-width:1160px;margin:0 auto;padding:48px 24px 72px}
+.kicker{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--accent)}
+h1{margin:8px 0 12px;font-size:44px;line-height:1.08;letter-spacing:-0.02em}
+.lede{margin:0;font-size:18px;color:var(--ink2);max-width:780px}
+.lab{margin-top:36px;display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.panel{flex:1 1 300px;max-width:360px;border:1px solid var(--line);border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:18px}
+.stage{flex:999 1 520px;min-width:0;display:flex;flex-direction:column;gap:16px}
+.card{border:1px solid var(--line);border-radius:12px;padding:16px}
+.label{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+select,button{font:inherit}
+select{width:100%;min-height:44px;padding:0 12px;border:1px solid #CDD2D9;border-radius:6px;background:#fff;color:var(--ink)}
+.row{display:flex;flex-direction:column;gap:6px}
+.slider{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center}
+.slider label{font-size:14px;color:var(--ink2)}
+.slider output{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--ink)}
+.slider input{grid-column:1 / -1;width:100%;accent-color:var(--accent);min-height:28px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{min-height:40px;padding:0 12px;border-radius:6px;border:1px solid #CDD2D9;background:#fff;color:var(--ink2);font-size:14px;font-weight:500;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{min-height:44px;padding:0 16px;border-radius:6px;border:1px solid #CDD2D9;background:#fff;color:var(--ink);font-size:14px;font-weight:500;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.note{font-size:14px;color:var(--ink2);background:var(--soft);border-radius:8px;padding:12px 14px}
+canvas{display:block;width:100%;border-radius:8px;background:#fff;touch-action:manipulation}
+.plots{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px}
+.plothead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;margin-bottom:8px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--ink2)}
+.legend i{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:6px;border-radius:2px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat{background:var(--soft);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.stat .v{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:500}
+.stat.sel{outline:2px solid var(--accent)}
+.verdict{border-radius:10px;padding:14px 16px;font-size:15px;font-weight:500}
+.verdict.ok{background:#E7F4F0;color:#0B4F42}
+.verdict.no{background:#FDECEA;color:#8A1C12}
+.theory{margin-top:64px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:32px}
+.theory h2{margin:0 0 10px;font-size:22px;line-height:1.25}
+.theory p{margin:0 0 10px;color:var(--ink2);font-size:15px}
+.eq{font-family:'IBM Plex Mono',monospace;font-size:14px;background:var(--soft);border-radius:8px;padding:12px 14px;margin:10px 0;overflow-x:auto;white-space:nowrap}
+footer{border-top:1px solid var(--line);margin-top:56px}
+footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:var(--muted)}
+.tour{margin-top:28px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
+.tour a{display:flex;flex-direction:column;gap:4px;padding:16px 18px;border:1px solid var(--line);border-radius:10px;text-decoration:none;color:var(--ink)}
+.tour a:hover{border-color:var(--accent)}
+.tour b{font-weight:600}
+.tour span{font-size:14px;color:var(--ink2)}
+.stop{margin-top:72px;padding-top:28px;border-top:1px solid var(--line);scroll-margin-top:16px}
+.stop h2{margin:6px 0 10px;font-size:32px;line-height:1.15;letter-spacing:-0.015em}
+.stop > p{margin:0;font-size:17px;color:var(--ink2);max-width:800px}
+.check{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--ink2);min-height:32px}
+.check input{width:18px;height:18px;accent-color:var(--accent)}
+.warn{font-size:13px;color:#8A1C12}
+@media (max-width:640px){h1{font-size:34px}.panel{max-width:none}.stop h2{font-size:26px}}
+</style>
+</head>
+<body>
+<header>
+<nav aria-label="Main">
+<a class="brand" href="index.html">Bhabani Shankar Dey</a>
+<div class="links">
+<a href="index.html#research">Research</a>
+<a href="index.html#publications">Publications</a>
+<a href="index.html#contact">Contact</a>
+</div>
+</nav>
+</header>
+
+<main>
+<span class="kicker">Interactive · plug and play</span>
+<h1>A visual tour through incremental stability</h1>
+<p class="lede">Classical stability asks whether trajectories reach an equilibrium. Incremental stability asks something stronger: do any two trajectories forget where they started and converge to each other? This tour shows two ways to certify it, live in your browser. Pick a system, move the sliders, and watch the certificate succeed or fail.</p>
+<nav class="tour" aria-label="Stops on the tour">
+<a href="#stop-contraction"><span class="mono" style="color:var(--accent)">Stop 1</span><b>Contraction and matrix measures</b><span>Certify convergence from the Jacobian, with a metric you choose.</span></a>
+<a href="#stop-lyapunov"><span class="mono" style="color:var(--accent)">Stop 2</span><b>Incremental Lyapunov functions</b><span>Build V(x, x̂), watch it decay along pairs of trajectories, and see the δ-ISS bound when inputs differ.</span></a>
+</nav>
+
+<section class="stop" id="stop-contraction" aria-labelledby="h-stop1">
+<span class="kicker">Stop 1</span>
+<h2 id="h-stop1">Contraction and matrix measures</h2>
+<p>Pick a system, change its parameters and the metric, and watch whether neighbouring trajectories converge to each other, and whether the matrix-measure test can certify it.</p>
+
+<div class="lab" aria-label="Contraction demo">
+<form class="panel" id="controls" onsubmit="return false">
+<div class="row">
+<label class="label" for="sys">System</label>
+<select id="sys">
+<option value="linear">Linear system  ẋ = Ax</option>
+<option value="tanh">Forced nonlinear network</option>
+<option value="vdp">Van der Pol oscillator</option>
+<option value="switched">State-dependent switched system</option>
+</select>
+</div>
+<div class="eq" id="eqn" aria-live="polite"></div>
+<div class="row" id="params"></div>
+<div class="row">
+<span class="label">Matrix measure</span>
+<div class="seg" role="group" aria-label="Matrix measure" id="measure">
+<button type="button" data-m="1">μ₁</button>
+<button type="button" data-m="2" aria-pressed="true">μ₂</button>
+<button type="button" data-m="inf">μ∞</button>
+</div>
+</div>
+<div class="slider">
+<label for="metric">Metric Θ = diag(1, s)</label><output id="metricOut">s = 1.00</output>
+<input id="metric" type="range" min="-1" max="1" step="0.02" value="0">
+</div>
+<div class="slider">
+<label for="ntraj">Trajectories</label><output id="ntrajOut">8</output>
+<input id="ntraj" type="range" min="2" max="16" step="1" value="8">
+</div>
+<div class="btns">
+<button type="button" class="btn primary" id="play">Pause</button>
+<button type="button" class="btn" id="shuffle">New initial conditions</button>
+</div>
+<p class="note" id="hint"></p>
+</form>
+
+<div class="stage">
+<div class="card">
+<div class="plothead">
+<span class="label">Phase plane — click to add an initial condition</span>
+<span class="mono" id="clock" style="font-size:13px;color:var(--muted)">t = 0.00</span>
+</div>
+<canvas id="phase" height="520" aria-label="Phase plane showing the vector field and trajectories of the selected system"></canvas>
+</div>
+<div class="plots">
+<div class="card">
+<div class="plothead"><span class="label">Spread of trajectories</span></div>
+<canvas id="dist" height="240" aria-label="Log plot of the largest distance between trajectories over time, with the contraction bound"></canvas>
+<div class="legend" style="margin-top:8px"><span><i style="background:#0B5CAD"></i>max ‖xᵢ(t) − xⱼ(t)‖ / D(0)</span><span><i style="background:#C2410C"></i>bound K e^{ct}</span></div>
+</div>
+<div class="card" style="display:flex;flex-direction:column;gap:12px">
+<span class="label">Certificate over the shown region</span>
+<div class="stats">
+<div class="stat" id="s1"><span class="label">sup μ₁</span><span class="v">—</span></div>
+<div class="stat sel" id="s2"><span class="label">sup μ₂</span><span class="v">—</span></div>
+<div class="stat" id="sinf"><span class="label">sup μ∞</span><span class="v">—</span></div>
+<div class="stat" id="semp"><span class="label">observed rate</span><span class="v">—</span></div>
+</div>
+<div class="verdict" id="verdict" aria-live="polite"></div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="theory" aria-label="Background on contraction">
+<div>
+<h2>Incremental stability in one line</h2>
+<p>A system ẋ = f(x, t) is <strong>contracting</strong> if every pair of trajectories converges to each other exponentially — independent of where they started:</p>
+<div class="eq">‖x₁(t) − x₂(t)‖ ≤ K e^{−λt} ‖x₁(0) − x₂(0)‖</div>
+<p>No equilibrium is needed. That is why it fits tracking, observers, synchronisation and systems driven by inputs.</p>
+</div>
+<div>
+<h2>The matrix-measure test</h2>
+<p>With Jacobian J = ∂f/∂x and a constant metric Θ, a sufficient condition is a uniformly negative matrix measure:</p>
+<div class="eq">μ(Θ J(x,t) Θ⁻¹) ≤ c &lt; 0  for all x, t</div>
+<p>Here μ₂(A) = λ<sub>max</sub>((A + Aᵀ)/2), μ₁ uses column sums and μ∞ row sums. The rate is λ = −c and K = cond(Θ), up to norm-equivalence factors.</p>
+</div>
+<div>
+<h2>Things to try</h2>
+<p><strong>Metric matters.</strong> In the linear system, A = [−1 4; 0 −1] is Hurwitz but μ₂(A) &gt; 0. Increase s above 2 and the certificate appears.</p>
+<p><strong>Entrainment.</strong> In the forced network, contracting systems forget initial conditions and lock onto a single periodic response to the input.</p>
+<p><strong>Not contracting.</strong> Van der Pol trajectories reach the same limit cycle but keep their phase difference — the spread never decays.</p>
+</div>
+</div>
+</section>
+
+<section class="stop" id="stop-lyapunov" aria-labelledby="h-stop2">
+<span class="kicker">Stop 2</span>
+<h2 id="h-stop2">Incremental Lyapunov functions</h2>
+<p>Instead of a matrix measure, build a function V(x, x̂) of two states that measures how far apart they are, and show it decreases along every pair of trajectories. Here V(x, x̂) = (x − x̂)ᵀ P (x − x̂). Drive the two copies with the same input to see δ-GAS, or give them different inputs to see the δ-ISS bound.</p>
+
+<div class="lab" aria-label="Incremental Lyapunov demo">
+<form class="panel" onsubmit="return false">
+<div class="row">
+<label class="label" for="lsys">System</label>
+<select id="lsys">
+<option value="linear">Linear system with input</option>
+<option value="pend">Damped pendulum</option>
+<option value="net">Nonlinear network</option>
+</select>
+</div>
+<div class="eq" id="leqn" aria-live="polite"></div>
+<div class="row" id="lparams"></div>
+<div class="row">
+<span class="label">Incremental Lyapunov function</span>
+<div class="eq" id="lP" style="margin:0"></div>
+<div class="slider">
+<label for="lp12">p₁₂ (coupling)</label><output id="lp12o">0.00</output>
+<input id="lp12" type="range" min="-3" max="3" step="0.01" value="0">
+</div>
+<div class="slider">
+<label for="lp22">p₂₂ (weight on x₂)</label><output id="lp22o">1.00</output>
+<input id="lp22" type="range" min="-1.3" max="1.3" step="0.01" value="0">
+</div>
+<div class="btns">
+<button type="button" class="btn" id="lauto">Solve AᵀP + PA = −I at origin</button>
+<button type="button" class="btn" id="lident">Reset to P = I</button>
+</div>
+<span class="warn" id="lpd" aria-live="polite"></span>
+</div>
+<div class="row">
+<span class="label">Inputs</span>
+<div class="slider">
+<label for="lU">common input u(t) = U sin(ωt), U</label><output id="lUo">0.80</output>
+<input id="lU" type="range" min="0" max="3" step="0.05" value="0.8">
+</div>
+<div class="slider">
+<label for="ldu">input mismatch û − u = δu</label><output id="lduo">0.00</output>
+<input id="ldu" type="range" min="0" max="1.5" step="0.05" value="0">
+</div>
+</div>
+<div class="slider">
+<label for="lr">Certify over the box |x₁|, |x₂| ≤ r</label><output id="lro">3.00</output>
+<input id="lr" type="range" min="0.5" max="3" step="0.05" value="3">
+</div>
+<label class="check"><input type="checkbox" id="lmap" checked> Show where V decreases</label>
+<div class="btns">
+<button type="button" class="btn primary" id="lplay">Pause</button>
+<button type="button" class="btn" id="lnew">New pair</button>
+</div>
+<p class="note" id="lhint"></p>
+</form>
+
+<div class="stage">
+<div class="card">
+<div class="plothead">
+<span class="label">Phase plane — click to move x(0), click again to move x̂(0)</span>
+<span class="mono" id="lclock" style="font-size:13px;color:var(--muted)">t = 0.00</span>
+</div>
+<canvas id="lphase" height="520" aria-label="Phase plane with two trajectories, the level set of the incremental Lyapunov function around one of them, and a map of where V decreases"></canvas>
+<div class="legend" style="margin-top:8px"><span><i style="background:#0B5CAD"></i>x(t), input u</span><span><i style="background:#C2410C"></i>x̂(t), input u + δu</span><span><i style="background:#0F6E5C"></i>level set V(x, x̂) = V(t)</span><span><i style="background:rgba(11,92,173,.35)"></i>V decreases</span><span><i style="background:rgba(180,35,24,.35)"></i>may increase</span></div>
+</div>
+<div class="plots">
+<div class="card">
+<div class="plothead"><span class="label">V along the pair</span></div>
+<canvas id="lV" height="240" aria-label="Log plot of V along the pair of trajectories with the guaranteed bound"></canvas>
+<div class="legend" style="margin-top:8px"><span><i style="background:#0B5CAD"></i>V(t) / V(0)</span><span><i style="background:#C2410C"></i>guaranteed bound</span><span><i style="background:#0F6E5C"></i>δ-ISS ultimate bound</span></div>
+</div>
+<div class="card" style="display:flex;flex-direction:column;gap:12px">
+<span class="label">Certificate over the box</span>
+<div class="stats">
+<div class="stat"><span class="label">sup decay c</span><span class="v" id="lc">—</span></div>
+<div class="stat"><span class="label">rate of ‖x − x̂‖</span><span class="v" id="lrate">—</span></div>
+<div class="stat"><span class="label">δ-ISS gain</span><span class="v" id="lgain">—</span></div>
+<div class="stat"><span class="label">observed rate</span><span class="v" id="lemp">—</span></div>
+</div>
+<div class="verdict" id="lverdict" aria-live="polite"></div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="theory" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))" aria-label="Background on incremental Lyapunov functions">
+<div>
+<h2>What an incremental Lyapunov function is</h2>
+<p>A function V(x, x̂) is an <strong>incremental Lyapunov function</strong> if it is sandwiched by the distance between its arguments and decreases along every pair of trajectories:</p>
+<div class="eq">α₁(‖x − x̂‖) ≤ V(x, x̂) ≤ α₂(‖x − x̂‖)</div>
+<div class="eq">V̇ ≤ −κ V(x, x̂)</div>
+<p>Then V(t) ≤ e^{−κt} V(0), so every pair converges: the system is incrementally globally asymptotically stable (δ-GAS).</p>
+</div>
+<div>
+<h2>With inputs: δ-ISS</h2>
+<p>If the two copies receive different inputs u and û, ask instead for</p>
+<div class="eq">V̇ ≤ −κ V + σ(‖u − û‖)</div>
+<p>The pair no longer converges, but its distance settles inside a ball whose size grows with the input mismatch. This incremental input-to-state stability (δ-ISS) is the property used for Sim2Real bounds and learned controllers.</p>
+</div>
+<div>
+<h2>How the demo checks it</h2>
+<p>For a quadratic V = δᵀPδ with δ = x − x̂, the mean-value theorem gives V̇ ≤ c V whenever</p>
+<div class="eq">JᵀP + PJ ≤ c P  for all x in the box</div>
+<p>The demo computes the largest generalised eigenvalue c(x) on a grid; the blue and red map shows its sign. With the input on x₂, ‖x − x̂‖ settles below 2√p₂₂ |δu| / (|c| √λ<sub>min</sub>(P)). A constant P is exactly a constant contraction metric Θ = P^{1/2}, so Stops 1 and 2 are two views of the same idea.</p>
+</div>
+<div>
+<h2>Things to try</h2>
+<p><strong>The right P.</strong> In the linear system, P = I fails because A = [−1 4; 0 −1] is not normal. Press “Solve AᵀP + PA = −I” and the certificate appears.</p>
+<p><strong>Local, not global.</strong> For the pendulum, cos x₁ changes sign beyond |x₁| = π/2, so no constant P works everywhere. Shrink the box r to find where V is a valid certificate.</p>
+<p><strong>δ-ISS.</strong> Raise δu: the pair stops converging but stays inside the green bound, which scales linearly with δu.</p>
+</div>
+</div>
+</section>
+</main>
+
+<footer><p>© 2026 Bhabani Shankar Dey · Part of my research on <a href="index.html#research">contraction theory and incremental stability</a>.</p></footer>
+
+<script>
+(function () {
+  var COLORS = ['#0B5CAD', '#C2410C', '#0F6E5C', '#7C3AED', '#B45309', '#BE185D', '#0E7490', '#4D7C0F'];
+  function sech2(v) { var c = Math.cosh(v); return 1 / (c * c); }
+  var SYSTEMS = {
+    linear: {
+      eq: 'ẋ = a₁₁x + a₁₂y\nẏ = a₂₁x + a₂₂y',
+      R: 3, T: 10,
+      params: [
+        { k: 'a11', label: 'a₁₁', min: -3, max: 2, step: 0.1, v: -1 },
+        { k: 'a12', label: 'a₁₂', min: -5, max: 5, step: 0.1, v: 4 },
+        { k: 'a21', label: 'a₂₁', min: -5, max: 5, step: 0.1, v: 0 },
+        { k: 'a22', label: 'a₂₂', min: -3, max: 2, step: 0.1, v: -1 }
+      ],
+      f: function (x, y, t, p) { return [p.a11 * x + p.a12 * y, p.a21 * x + p.a22 * y]; },
+      J: function (x, y, t, p) { return [[p.a11, p.a12], [p.a21, p.a22]]; },
+      hint: 'A = [−1 4; 0 −1] is Hurwitz, yet μ₂(A) = 1 > 0: trajectories first spread apart. Slide s past 2 — a weighted metric certifies contraction.'
+    },
+    tanh: {
+      eq: 'ẋ = −a x + b tanh(y) + A sin(ωt)\nẏ = −a y − b tanh(x)',
+      R: 4, T: 14,
+      params: [
+        { k: 'a', label: 'damping a', min: 0, max: 3, step: 0.05, v: 1 },
+        { k: 'b', label: 'coupling b', min: 0, max: 5, step: 0.05, v: 1.5 },
+        { k: 'A', label: 'input amplitude A', min: 0, max: 3, step: 0.1, v: 1.5 },
+        { k: 'w', label: 'input frequency ω', min: 0.2, max: 4, step: 0.1, v: 1.5 }
+      ],
+      f: function (x, y, t, p) { return [-p.a * x + p.b * Math.tanh(y) + p.A * Math.sin(p.w * t), -p.a * y - p.b * Math.tanh(x)]; },
+      J: function (x, y, t, p) { return [[-p.a, p.b * sech2(y)], [-p.b * sech2(x), -p.a]]; },
+      hint: 'μ₂(J) ≤ −a + b/2, so the network contracts when a > b/2. Then every trajectory locks onto the same periodic response to the input. Lower a to lose the guarantee.'
+    },
+    vdp: {
+      eq: 'ẋ = y\nẏ = μ(1 − x²) y − x',
+      R: 4, T: 14,
+      params: [{ k: 'mu', label: 'μ', min: 0.1, max: 3, step: 0.05, v: 1 }],
+      f: function (x, y, t, p) { return [y, p.mu * (1 - x * x) * y - x]; },
+      J: function (x, y, t, p) { return [[0, 1], [-2 * p.mu * x * y - 1, p.mu * (1 - x * x)]]; },
+      hint: 'A stable limit cycle is not contraction: trajectories reach the same orbit but keep their phase lag, so the spread stays bounded away from zero.'
+    },
+    switched: {
+      eq: 'ẋ = A₁x  if x₁ ≥ 0,  A₂x  otherwise\nA₁ = [−a 3; −3 −a],  A₂ = [−a 1; −4 −a]',
+      R: 3, T: 10,
+      params: [{ k: 'a', label: 'damping a', min: 0, max: 3, step: 0.05, v: 1 }],
+      mode: function (x) { return x >= 0 ? 0 : 1; },
+      f: function (x, y, t, p) { return x >= 0 ? [-p.a * x + 3 * y, -3 * x - p.a * y] : [-p.a * x + y, -4 * x - p.a * y]; },
+      J: function (x, y, t, p) { return x >= 0 ? [[-p.a, 3], [-3, -p.a]] : [[-p.a, 1], [-4, -p.a]]; },
+      hint: 'μ₂(A₁) = −a and μ₂(A₂) = −a + 1.5. A common metric with both measures negative is a sufficient condition (plus compatibility at the switching surface x₁ = 0).'
+    }
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { sys: 'linear', p: {}, measure: '2', s: 1, n: 8, ics: [], traj: [], spread: [], frame: 0, playing: true, cert: null, emp: null };
+
+  function mu(A, kind) {
+    var a = A[0][0], b = A[0][1], c = A[1][0], d = A[1][1];
+    if (kind === '1') return Math.max(a + Math.abs(c), d + Math.abs(b));
+    if (kind === 'inf') return Math.max(a + Math.abs(b), d + Math.abs(c));
+    var m = (b + c) / 2;
+    return (a + d) / 2 + Math.sqrt(((a - d) / 2) * ((a - d) / 2) + m * m);
+  }
+  function weighted(J, s) { return [[J[0][0], J[0][1] / s], [J[1][0] * s, J[1][1]]]; }
+
+  function buildParams() {
+    var S = SYSTEMS[state.sys], box = $('params');
+    box.innerHTML = '';
+    state.p = {};
+    S.params.forEach(function (q) {
+      state.p[q.k] = q.v;
+      var w = document.createElement('div');
+      w.className = 'slider';
+      var id = 'p_' + q.k;
+      w.innerHTML = '<label for="' + id + '">' + q.label + '</label><output id="' + id + 'o">' + q.v.toFixed(2) + '</output>' +
+        '<input id="' + id + '" type="range" min="' + q.min + '" max="' + q.max + '" step="' + q.step + '" value="' + q.v + '">';
+      box.appendChild(w);
+      w.querySelector('input').addEventListener('input', function (e) {
+        state.p[q.k] = parseFloat(e.target.value);
+        $(id + 'o').textContent = state.p[q.k].toFixed(2);
+        simulate(false);
+      });
+    });
+    $('eqn').textContent = S.eq;
+    $('eqn').style.whiteSpace = 'pre';
+    $('hint').textContent = S.hint;
+  }
+
+  function randomICs() {
+    var R = SYSTEMS[state.sys].R;
+    state.ics = [];
+    for (var i = 0; i < state.n; i++) {
+      var ang = (i / state.n) * 2 * Math.PI + Math.random() * 0.4;
+      var r = R * (0.45 + Math.random() * 0.45);
+      state.ics.push([r * Math.cos(ang), r * Math.sin(ang)]);
+    }
+  }
+
+  var DT = 0.01;
+  function simulate(resetFrame) {
+    var S = SYSTEMS[state.sys], p = state.p, steps = Math.round(S.T / DT);
+    state.traj = state.ics.map(function (ic) {
+      var x = ic[0], y = ic[1], out = new Float64Array((steps + 1) * 2);
+      out[0] = x; out[1] = y;
+      for (var k = 0; k < steps; k++) {
+        var t = k * DT;
+        var k1 = S.f(x, y, t, p);
+        var k2 = S.f(x + DT / 2 * k1[0], y + DT / 2 * k1[1], t + DT / 2, p);
+        var k3 = S.f(x + DT / 2 * k2[0], y + DT / 2 * k2[1], t + DT / 2, p);
+        var k4 = S.f(x + DT * k3[0], y + DT * k3[1], t + DT, p);
+        x += DT / 6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]);
+        y += DT / 6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
+        if (!isFinite(x) || Math.abs(x) > 1e6) x = NaN;
+        if (!isFinite(y) || Math.abs(y) > 1e6) y = NaN;
+        out[(k + 1) * 2] = x; out[(k + 1) * 2 + 1] = y;
+      }
+      return out;
+    });
+    state.spread = new Float64Array(steps + 1);
+    for (var k = 0; k <= steps; k++) {
+      var m = 0;
+      for (var i = 0; i < state.traj.length; i++) for (var j = i + 1; j < state.traj.length; j++) {
+        var dx = state.traj[i][2 * k] - state.traj[j][2 * k], dy = state.traj[i][2 * k + 1] - state.traj[j][2 * k + 1];
+        var dd = Math.sqrt(dx * dx + dy * dy);
+        if (dd > m || isNaN(dd)) m = isNaN(dd) ? Infinity : dd;
+      }
+      state.spread[k] = m;
+    }
+    var h = Math.floor(steps / 2), a = state.spread[h], b = state.spread[steps];
+    state.emp = (a > 0 && b > 0 && isFinite(a) && isFinite(b)) ? Math.log(b / a) / (S.T - h * DT) : null;
+    certify();
+    if (resetFrame) state.frame = 0;
+    if (!state.playing) state.frame = steps;
+    draw();
+  }
+
+  function certify() {
+    var S = SYSTEMS[state.sys], R = S.R, N = 41, best = { '1': -Infinity, '2': -Infinity, 'inf': -Infinity };
+    for (var i = 0; i < N; i++) for (var j = 0; j < N; j++) {
+      var x = -R + 2 * R * i / (N - 1), y = -R + 2 * R * j / (N - 1);
+      var J = weighted(S.J(x, y, 0, state.p), state.s);
+      ['1', '2', 'inf'].forEach(function (k) { var v = mu(J, k); if (v > best[k]) best[k] = v; });
+      if (state.sys === 'switched' && i === (N - 1) / 2) {
+        var J2 = weighted(S.J(-1e-9, y, 0, state.p), state.s);
+        ['1', '2', 'inf'].forEach(function (k) { var v = mu(J2, k); if (v > best[k]) best[k] = v; });
+      }
+    }
+    state.cert = best;
+    var fmt = function (v) { return (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2); };
+    $('s1').querySelector('.v').textContent = fmt(best['1']);
+    $('s2').querySelector('.v').textContent = fmt(best['2']);
+    $('sinf').querySelector('.v').textContent = fmt(best['inf']);
+    $('semp').querySelector('.v').textContent = state.emp === null ? '—' : fmt(state.emp);
+    ['s1', 's2', 'sinf'].forEach(function (id) { $(id).classList.toggle('sel', id === 's' + state.measure); });
+    var c = best[state.measure], v = $('verdict'), name = state.measure === 'inf' ? 'μ∞' : (state.measure === '1' ? 'μ₁' : 'μ₂');
+    var metric = state.s === 1 ? 'the identity metric' : 'the metric Θ = diag(1, ' + state.s.toFixed(2) + ')';
+    if (c < 0) {
+      v.className = 'verdict ok';
+      v.textContent = 'Certified: ' + name + ' ≤ ' + fmt(c) + ' everywhere shown, in ' + metric + '. The system contracts at rate λ ≥ ' + (-c).toFixed(2) + '.';
+    } else {
+      v.className = 'verdict no';
+      v.textContent = 'Not certified in ' + metric + ': ' + name + ' reaches ' + fmt(c) + '. This test is only sufficient — try another measure or metric.';
+    }
+  }
+
+  function setupCanvas(cv) {
+    var dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = Math.round(w * (cv.id === 'phase' ? 0.72 : 0.6));
+    if (cv.id === 'phase' && window.innerWidth < 640) h = Math.round(w * 0.95);
+    cv.style.height = h + 'px';
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    var ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx: ctx, w: w, h: h };
+  }
+
+  function draw() {
+    var S = SYSTEMS[state.sys], R = S.R, steps = Math.round(S.T / DT), k = Math.min(state.frame, steps), t = k * DT;
+    $('clock').textContent = 't = ' + t.toFixed(2);
+    var P = setupCanvas($('phase')), ctx = P.ctx, W = P.w, H = P.h;
+    var Rx = R * Math.max(1, W / H), Ry = R * Math.max(1, H / W);
+    var X = function (x) { return (x + Rx) / (2 * Rx) * W; }, Y = function (y) { return H - (y + Ry) / (2 * Ry) * H; };
+    ctx.clearRect(0, 0, W, H);
+    ctx.strokeStyle = '#E3E6EA'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, Y(0)); ctx.lineTo(W, Y(0)); ctx.moveTo(X(0), 0); ctx.lineTo(X(0), H); ctx.stroke();
+    if (state.sys === 'switched') {
+      ctx.save(); ctx.setLineDash([6, 5]); ctx.strokeStyle = '#B45309'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(X(0), 0); ctx.lineTo(X(0), H); ctx.stroke(); ctx.restore();
+      ctx.fillStyle = '#8A4B08'; ctx.font = '12px "IBM Plex Mono", monospace';
+      ctx.fillText('switching surface x₁ = 0', X(0) + 8, 18);
+      ctx.fillStyle = '#5A6270'; ctx.fillText('A₂', 12, 18); ctx.fillText('A₁', W - 28, 18);
+    }
+    var G = 19;
+    ctx.strokeStyle = '#B7BEC8'; ctx.lineWidth = 1;
+    for (var i = 0; i < G; i++) for (var j = 0; j < G; j++) {
+      var gx = -Rx + 2 * Rx * (i + 0.5) / G, gy = -Ry + 2 * Ry * (j + 0.5) / G;
+      var f = S.f(gx, gy, t, state.p), n = Math.sqrt(f[0] * f[0] + f[1] * f[1]);
+      if (n < 1e-9) continue;
+      var L = Math.min(W, H) / G * 0.38, ux = f[0] / n, uy = f[1] / n;
+      var x0 = X(gx) - ux * L, y0 = Y(gy) + uy * L, x1 = X(gx) + ux * L, y1 = Y(gy) - uy * L;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
+      var ah = 4, an = Math.atan2(y1 - y0, x1 - x0);
+      ctx.lineTo(x1 - ah * Math.cos(an - 0.5), y1 - ah * Math.sin(an - 0.5));
+      ctx.moveTo(x1, y1); ctx.lineTo(x1 - ah * Math.cos(an + 0.5), y1 - ah * Math.sin(an + 0.5));
+      ctx.stroke();
+    }
+    state.traj.forEach(function (tr, idx) {
+      var col = COLORS[idx % COLORS.length];
+      ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      var started = false;
+      for (var q = 0; q <= k; q += 2) {
+        var x = tr[2 * q], y = tr[2 * q + 1];
+        if (isNaN(x) || isNaN(y)) break;
+        if (!started) { ctx.moveTo(X(x), Y(y)); started = true; } else ctx.lineTo(X(x), Y(y));
+      }
+      ctx.stroke(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = col; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(X(tr[0]), Y(tr[1]), 4, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+      var cx = tr[2 * k], cy = tr[2 * k + 1];
+      if (!isNaN(cx) && !isNaN(cy)) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(X(cx), Y(cy), 5.5, 0, 2 * Math.PI); ctx.fill(); }
+    });
+    state.view = { Rx: Rx, Ry: Ry, W: W, H: H };
+    drawSpread(k, steps);
+  }
+
+  function drawSpread(k, steps) {
+    var S = SYSTEMS[state.sys], P = setupCanvas($('dist')), ctx = P.ctx, W = P.w, H = P.h;
+    var padL = 44, padB = 26, padT = 10, padR = 10, lo = -6, hi = 2;
+    var X = function (t) { return padL + t / S.T * (W - padL - padR); };
+    var Y = function (v) { v = Math.max(lo, Math.min(hi, v)); return padT + (hi - v) / (hi - lo) * (H - padT - padB); };
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '11px "IBM Plex Mono", monospace'; ctx.fillStyle = '#5A6270'; ctx.strokeStyle = '#E3E6EA'; ctx.lineWidth = 1;
+    for (var e = lo; e <= hi; e += 2) {
+      ctx.beginPath(); ctx.moveTo(padL, Y(e)); ctx.lineTo(W - padR, Y(e)); ctx.stroke();
+      ctx.fillText('1e' + e, 4, Y(e) + 4);
+    }
+    for (var tt = 0; tt <= S.T; tt += 2) ctx.fillText(String(tt), X(tt) - 4, H - 8);
+    var D0 = state.spread[0];
+    var c = state.cert ? state.cert[state.measure] : null;
+    if (c !== null && isFinite(c)) {
+      var K = Math.max(state.s, 1 / state.s) * (state.measure === '2' ? 1 : Math.SQRT2);
+      ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#C2410C'; ctx.lineWidth = 2; ctx.beginPath();
+      for (var q = 0; q <= 60; q++) { var t = S.T * q / 60, v = Math.log10(K) + c * t / Math.LN10; if (q === 0) ctx.moveTo(X(t), Y(v)); else ctx.lineTo(X(t), Y(v)); }
+      ctx.stroke(); ctx.restore();
+    }
+    ctx.strokeStyle = '#0B5CAD'; ctx.lineWidth = 2.5; ctx.beginPath();
+    for (var q2 = 0; q2 <= k; q2 += 4) {
+      var r = state.spread[q2] / D0, v2 = isFinite(r) && r > 0 ? Math.log10(r) : hi;
+      if (q2 === 0) ctx.moveTo(X(q2 * DT), Y(v2)); else ctx.lineTo(X(q2 * DT), Y(v2));
+    }
+    ctx.stroke();
+  }
+
+  function loop() {
+    var steps = Math.round(SYSTEMS[state.sys].T / DT);
+    if (state.playing) {
+      state.frame += 4;
+      if (state.frame > steps + 150) state.frame = 0;
+      draw();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  $('sys').addEventListener('change', function (e) {
+    state.sys = e.target.value; state.s = 1; $('metric').value = 0; $('metricOut').textContent = 's = 1.00';
+    buildParams(); randomICs(); simulate(true); });
+  $('measure').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    state.measure = b.getAttribute('data-m');
+    $('measure').querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    certify(); draw();
+  });
+  $('metric').addEventListener('input', function (e) { state.s = Math.pow(10, parseFloat(e.target.value)); $('metricOut').textContent = 's = ' + state.s.toFixed(2); certify(); draw(); });
+  $('ntraj').addEventListener('input', function (e) { state.n = parseInt(e.target.value, 10); $('ntrajOut').textContent = state.n; randomICs(); simulate(true); });
+  $('shuffle').addEventListener('click', function () { randomICs(); simulate(true); });
+  $('play').addEventListener('click', function () {
+    state.playing = !state.playing; this.textContent = state.playing ? 'Pause' : 'Play';
+    if (!state.playing) { state.frame = Math.round(SYSTEMS[state.sys].T / DT); draw(); }
+  });
+  $('phase').addEventListener('click', function (e) {
+    if (!state.view) return;
+    var r = this.getBoundingClientRect(), v = state.view;
+    var x = (e.clientX - r.left) / v.W * 2 * v.Rx - v.Rx, y = v.Ry - (e.clientY - r.top) / v.H * 2 * v.Ry;
+    state.ics.push([x, y]); if (state.ics.length > 16) state.ics.shift();
+    simulate(true);
+  });
+  window.addEventListener('resize', draw);
+
+  buildParams(); randomICs(); simulate(true); requestAnimationFrame(loop);
+})();
+</script>
+<script>
+/* Stop 2: incremental Lyapunov functions V(x, x̂) = (x − x̂)ᵀ P (x − x̂) */
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var SYS = {
+    linear: {
+      eq: 'ẋ₁ = a₁₁x₁ + a₁₂x₂\nẋ₂ = a₂₁x₁ + a₂₂x₂ + u',
+      R: 3, T: 10,
+      params: [
+        { k: 'a11', label: 'a₁₁', min: -3, max: 1, step: 0.1, v: -1 },
+        { k: 'a12', label: 'a₁₂', min: -5, max: 5, step: 0.1, v: 4 },
+        { k: 'a21', label: 'a₂₁', min: -5, max: 5, step: 0.1, v: 0 },
+        { k: 'a22', label: 'a₂₂', min: -3, max: 1, step: 0.1, v: -1 }
+      ],
+      f: function (x, y, u, p) { return [p.a11 * x + p.a12 * y, p.a21 * x + p.a22 * y + u]; },
+      J: function (x, y, p) { return [[p.a11, p.a12], [p.a21, p.a22]]; },
+      hint: 'A = [−1 4; 0 −1] is Hurwitz, but with P = I the function V = ‖x − x̂‖² can grow at first. Solve the Lyapunov equation to get a P that certifies δ-GAS.'
+    },
+    pend: {
+      eq: 'ẋ₁ = x₂\nẋ₂ = −g sin x₁ − d x₂ + u',
+      R: 3, T: 12,
+      params: [
+        { k: 'g', label: 'gravity g', min: 0.2, max: 3, step: 0.05, v: 1 },
+        { k: 'd', label: 'damping d', min: 0.1, max: 3, step: 0.05, v: 1.4 }
+      ],
+      f: function (x, y, u, p) { return [y, -p.g * Math.sin(x) - p.d * y + u]; },
+      J: function (x, y, p) { return [[0, 1], [-p.g * Math.cos(x), -p.d]]; },
+      hint: 'Near the bottom the pendulum is incrementally stable, but cos x₁ < 0 beyond |x₁| = π/2. Solve for P, then shrink the box r until the certificate holds.'
+    },
+    net: {
+      eq: 'ẋ₁ = −a x₁ + b tanh(x₂)\nẋ₂ = −a x₂ − b tanh(x₁) + u',
+      R: 3, T: 10,
+      params: [
+        { k: 'a', label: 'damping a', min: 0, max: 3, step: 0.05, v: 1 },
+        { k: 'b', label: 'coupling b', min: 0, max: 5, step: 0.05, v: 1.5 }
+      ],
+      f: function (x, y, u, p) { return [-p.a * x + p.b * Math.tanh(y), -p.a * y - p.b * Math.tanh(x) + u]; },
+      J: function (x, y, p) { var cy = Math.cosh(y), cx = Math.cosh(x); return [[-p.a, p.b / (cy * cy)], [-p.b / (cx * cx), -p.a]]; },
+      hint: 'With P = I the decay rate is at most −2a + b, so V decreases everywhere when a > b/2. Add an input mismatch δu to see the pair settle in the δ-ISS ball.'
+    }
+  };
+  var W = 1.5, DT = 0.01;
+  var st = { sys: 'linear', p: {}, p12: 0, p22: 1, U: 0.8, du: 0, r: 3, map: true, playing: true, frame: 0, pick: 0,
+             a: [-2, 1.5], b: [2, -1.2], ta: null, tb: null, V: null, c: null, emp: null };
+
+  function Pm() { return [[1, st.p12], [st.p12, st.p22]]; }
+  function pd() { return st.p22 - st.p12 * st.p12 > 1e-6; }
+  function lamMinP() { var a = 1, d = st.p22, b = st.p12, m = (a + d) / 2, q = Math.sqrt(((a - d) / 2) * ((a - d) / 2) + b * b); return m - q; }
+
+  /* largest generalised eigenvalue of (JᵀP + PJ, P) */
+  function rate(J) {
+    var P = Pm();
+    var M11 = 2 * (J[0][0] * P[0][0] + J[1][0] * P[1][0]);
+    var M22 = 2 * (J[0][1] * P[0][1] + J[1][1] * P[1][1]);
+    var M12 = J[0][0] * P[0][1] + J[1][0] * P[1][1] + P[0][0] * J[0][1] + P[0][1] * J[1][1];
+    var a = P[0][0] * P[1][1] - P[0][1] * P[0][1];
+    var b = -(M11 * P[1][1] + M22 * P[0][0] - 2 * M12 * P[0][1]);
+    var c = M11 * M22 - M12 * M12;
+    var disc = Math.max(0, b * b - 4 * a * c);
+    return (-b + Math.sqrt(disc)) / (2 * a);
+  }
+
+  function buildParams() {
+    var S = SYS[st.sys], box = $('lparams'); box.innerHTML = ''; st.p = {};
+    S.params.forEach(function (q) {
+      st.p[q.k] = q.v;
+      var w = document.createElement('div'); w.className = 'slider'; var id = 'lq_' + q.k;
+      w.innerHTML = '<label for="' + id + '">' + q.label + '</label><output id="' + id + 'o">' + q.v.toFixed(2) + '</output>' +
+        '<input id="' + id + '" type="range" min="' + q.min + '" max="' + q.max + '" step="' + q.step + '" value="' + q.v + '">';
+      box.appendChild(w);
+      w.querySelector('input').addEventListener('input', function (e) { st.p[q.k] = parseFloat(e.target.value); $(id + 'o').textContent = st.p[q.k].toFixed(2); run(false); });
+    });
+    $('leqn').textContent = S.eq; $('leqn').style.whiteSpace = 'pre';
+    $('lhint').textContent = S.hint;
+    st.r = S.R; $('lr').max = S.R; $('lr').value = S.R; $('lro').textContent = S.R.toFixed(2);
+  }
+
+  function setP(p12, p22) {
+    st.p12 = Math.max(-3, Math.min(3, p12)); st.p22 = Math.max(0.05, Math.min(20, p22));
+    $('lp12').value = st.p12; $('lp12o').textContent = st.p12.toFixed(2);
+    $('lp22').value = Math.log10(st.p22); $('lp22o').textContent = st.p22.toFixed(2);
+  }
+
+  function solveLyap() {
+    var A = SYS[st.sys].J(0, 0, st.p), a = A[0][0], b = A[0][1], c = A[1][0], d = A[1][1];
+    /* AᵀP + PA = −I with P = [p q; q r] */
+    var M = [[2 * a, 2 * c, 0], [b, a + d, c], [0, 2 * b, 2 * d]], rhs = [-1, 0, -1];
+    var det3 = function (m) { return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]); };
+    var D = det3(M);
+    if (Math.abs(D) < 1e-9) { $('lpd').textContent = 'The Lyapunov equation has no unique solution for these parameters.'; return; }
+    var sol = [0, 1, 2].map(function (k) { var m = M.map(function (row, i) { var r = row.slice(); r[k] = rhs[i]; return r; }); return det3(m) / D; });
+    var p = sol[0], q = sol[1], r = sol[2];
+    if (!(p > 0 && p * r - q * q > 0)) { $('lpd').textContent = 'The linearisation at the origin is not Hurwitz, so no quadratic Lyapunov function exists there.'; return; }
+    setP(q / p, r / p); run(false);
+  }
+
+  function simulate(x0, du) {
+    var S = SYS[st.sys], n = Math.round(S.T / DT), out = new Float64Array((n + 1) * 2), x = x0[0], y = x0[1];
+    out[0] = x; out[1] = y;
+    for (var k = 0; k < n; k++) {
+      var t = k * DT, u = function (tt) { return st.U * Math.sin(W * tt) + du; };
+      var k1 = S.f(x, y, u(t), st.p), k2 = S.f(x + DT / 2 * k1[0], y + DT / 2 * k1[1], u(t + DT / 2), st.p);
+      var k3 = S.f(x + DT / 2 * k2[0], y + DT / 2 * k2[1], u(t + DT / 2), st.p), k4 = S.f(x + DT * k3[0], y + DT * k3[1], u(t + DT), st.p);
+      x += DT / 6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]); y += DT / 6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
+      if (!isFinite(x) || Math.abs(x) > 1e6) x = NaN; if (!isFinite(y) || Math.abs(y) > 1e6) y = NaN;
+      out[(k + 1) * 2] = x; out[(k + 1) * 2 + 1] = y;
+    }
+    return out;
+  }
+  function Vof(dx, dy) { return dx * dx + 2 * st.p12 * dx * dy + st.p22 * dy * dy; }
+
+  function run(reset) {
+    var S = SYS[st.sys], n = Math.round(S.T / DT);
+    st.ta = simulate(st.a, 0); st.tb = simulate(st.b, st.du);
+    st.V = new Float64Array(n + 1);
+    for (var k = 0; k <= n; k++) st.V[k] = Vof(st.ta[2 * k] - st.tb[2 * k], st.ta[2 * k + 1] - st.tb[2 * k + 1]);
+    var h = Math.floor(n / 2), v1 = st.V[h], v2 = st.V[n];
+    st.emp = (v1 > 0 && v2 > 0 && isFinite(v1) && isFinite(v2)) ? Math.log(v2 / v1) / (S.T - h * DT) : null;
+    certify();
+    if (reset) st.frame = 0;
+    if (!st.playing) st.frame = n;
+    draw();
+  }
+
+  function certify() {
+    var S = SYS[st.sys], N = 41, best = -Infinity;
+    $('lP').textContent = 'P = [ 1   ' + st.p12.toFixed(2) + ' ;  ' + st.p12.toFixed(2) + '   ' + st.p22.toFixed(2) + ' ]';
+    var fmt = function (v) { return (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2); };
+    if (!pd()) {
+      st.c = null; $('lpd').textContent = 'P is not positive definite (need p₂₂ > p₁₂²), so V is not a valid Lyapunov candidate.';
+      ['lc', 'lrate', 'lgain'].forEach(function (id) { $(id).textContent = '—'; });
+      $('lemp').textContent = st.emp === null ? '—' : fmt(st.emp);
+      var v0 = $('lverdict'); v0.className = 'verdict no'; v0.textContent = 'Not a certificate: choose a positive definite P.';
+      return;
+    }
+    $('lpd').textContent = '';
+    for (var i = 0; i < N; i++) for (var j = 0; j < N; j++) {
+      var x = -st.r + 2 * st.r * i / (N - 1), y = -st.r + 2 * st.r * j / (N - 1);
+      var c = rate(S.J(x, y, st.p)); if (c > best) best = c;
+    }
+    st.c = best;
+    $('lc').textContent = fmt(best);
+    $('lrate').textContent = best < 0 ? '−' + (-best / 2).toFixed(2) : '—';
+    var gain = best < 0 ? 2 * Math.sqrt(st.p22) / (-best * Math.sqrt(lamMinP())) : null;
+    $('lgain').textContent = gain === null ? '—' : gain.toFixed(2);
+    $('lemp').textContent = st.emp === null ? '—' : fmt(st.emp);
+    var v = $('lverdict'), box = 'the box |x₁|, |x₂| ≤ ' + st.r.toFixed(2);
+    if (best < 0) {
+      v.className = 'verdict ok';
+      v.textContent = 'Certified on ' + box + ': JᵀP + PJ ≤ ' + fmt(best) + '·P, so V(t) ≤ e^{' + fmt(best) + 't} V(0) for pairs that stay in the box.' +
+        (st.du > 0 ? ' With δu = ' + st.du.toFixed(2) + ', ‖x − x̂‖ settles below ' + (gain * st.du).toFixed(2) + ' (δ-ISS).' : ' The system is δ-GAS there.');
+    } else {
+      v.className = 'verdict no';
+      v.textContent = 'Not certified on ' + box + ': somewhere JᵀP + PJ reaches ' + fmt(best) + '·P. This V may grow there — try another P or a smaller box.';
+    }
+  }
+
+  function setup(cv, ratio) {
+    var dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = Math.round(w * ratio);
+    if (cv.id === 'lphase' && window.innerWidth < 640) h = Math.round(w * 0.95);
+    cv.style.height = h + 'px'; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    var ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx: ctx, w: w, h: h };
+  }
+
+  function draw() {
+    var S = SYS[st.sys], R = S.R, n = Math.round(S.T / DT), k = Math.min(st.frame, n), t = k * DT;
+    $('lclock').textContent = 't = ' + t.toFixed(2);
+    var P = setup($('lphase'), 0.72), ctx = P.ctx, Wd = P.w, H = P.h;
+    var Rx = R * Math.max(1, Wd / H), Ry = R * Math.max(1, H / Wd);
+    var X = function (x) { return (x + Rx) / (2 * Rx) * Wd; }, Y = function (y) { return H - (y + Ry) / (2 * Ry) * H; };
+    ctx.clearRect(0, 0, Wd, H);
+    if (st.map && pd()) {
+      var G = 48, cw = Wd / G, rows = Math.ceil(H / cw);
+      for (var i = 0; i < G; i++) for (var j = 0; j < rows; j++) {
+        var gx = -Rx + 2 * Rx * (i + 0.5) / G, gy = Ry - (j + 0.5) * cw / H * 2 * Ry;
+        var c = rate(S.J(gx, gy, st.p)), a = Math.min(0.32, 0.08 + Math.abs(c) * 0.06);
+        ctx.fillStyle = c < 0 ? 'rgba(11,92,173,' + a + ')' : 'rgba(180,35,24,' + a + ')';
+        ctx.fillRect(i * cw, j * cw, cw + 0.5, cw + 0.5);
+      }
+    }
+    ctx.strokeStyle = '#D5DAE0'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, Y(0)); ctx.lineTo(Wd, Y(0)); ctx.moveTo(X(0), 0); ctx.lineTo(X(0), H); ctx.stroke();
+    ctx.save(); ctx.setLineDash([5, 4]); ctx.strokeStyle = '#14181F'; ctx.lineWidth = 1.2;
+    ctx.strokeRect(X(-st.r), Y(st.r), X(st.r) - X(-st.r), Y(-st.r) - Y(st.r)); ctx.restore();
+    ctx.fillStyle = '#3D4552'; ctx.font = '12px "IBM Plex Mono", monospace'; ctx.fillText('certificate box', X(-st.r) + 6, Y(st.r) + 16);
+    var G2 = 17; ctx.strokeStyle = 'rgba(90,98,112,.55)'; ctx.lineWidth = 1;
+    for (var i2 = 0; i2 < G2; i2++) for (var j2 = 0; j2 < G2; j2++) {
+      var vx = -Rx + 2 * Rx * (i2 + 0.5) / G2, vy = -Ry + 2 * Ry * (j2 + 0.5) / G2, f = S.f(vx, vy, 0, st.p), nn = Math.hypot(f[0], f[1]);
+      if (nn < 1e-9) continue;
+      var L = Math.min(Wd, H) / G2 * 0.34, ux = f[0] / nn, uy = f[1] / nn;
+      ctx.beginPath(); ctx.moveTo(X(vx) - ux * L, Y(vy) + uy * L); ctx.lineTo(X(vx) + ux * L, Y(vy) - uy * L); ctx.stroke();
+      ctx.beginPath(); ctx.arc(X(vx) + ux * L, Y(vy) - uy * L, 1.6, 0, 2 * Math.PI); ctx.fillStyle = 'rgba(90,98,112,.7)'; ctx.fill();
+    }
+    function path(tr, col) {
+      ctx.strokeStyle = col; ctx.lineWidth = 2.2; ctx.beginPath(); var s0 = false;
+      for (var q = 0; q <= k; q += 2) { var x = tr[2 * q], y = tr[2 * q + 1]; if (isNaN(x) || isNaN(y)) break; if (!s0) { ctx.moveTo(X(x), Y(y)); s0 = true; } else ctx.lineTo(X(x), Y(y)); }
+      ctx.stroke();
+      ctx.fillStyle = '#FFFFFF'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(tr[0]), Y(tr[1]), 5, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+    }
+    function ellipse(cx, cy, V, style, dash) {
+      if (!pd() || !(V > 0) || isNaN(cx) || isNaN(cy)) return;
+      var L22 = Math.sqrt(st.p22 - st.p12 * st.p12), s = Math.sqrt(V);
+      ctx.save(); if (dash) ctx.setLineDash(dash); ctx.strokeStyle = style; ctx.lineWidth = 2; ctx.beginPath();
+      for (var m = 0; m <= 72; m++) {
+        var th = m / 72 * 2 * Math.PI, w2 = Math.sin(th) / L22, w1 = Math.cos(th) - st.p12 * w2;
+        var px = X(cx + s * w1), py = Y(cy + s * w2); if (m === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke(); ctx.restore();
+    }
+    ellipse(st.tb[0], st.tb[1], st.V[0], 'rgba(15,110,92,.35)', [4, 4]);
+    path(st.ta, '#0B5CAD'); path(st.tb, '#C2410C');
+    var bx = st.tb[2 * k], by = st.tb[2 * k + 1], ax = st.ta[2 * k], ay = st.ta[2 * k + 1];
+    ellipse(bx, by, st.V[k], '#0F6E5C');
+    if (!isNaN(ax) && !isNaN(bx)) { ctx.strokeStyle = '#14181F'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(ax), Y(ay)); ctx.lineTo(X(bx), Y(by)); ctx.stroke(); }
+    [[ax, ay, '#0B5CAD'], [bx, by, '#C2410C']].forEach(function (d) { if (!isNaN(d[0]) && !isNaN(d[1])) { ctx.fillStyle = d[2]; ctx.beginPath(); ctx.arc(X(d[0]), Y(d[1]), 6, 0, 2 * Math.PI); ctx.fill(); } });
+    ctx.fillStyle = '#14181F'; ctx.font = '12px "IBM Plex Mono", monospace';
+    ctx.fillText('next click sets ' + (st.pick === 0 ? 'x(0)' : 'x̂(0)'), Wd - 170, H - 10);
+    st.view = { Rx: Rx, Ry: Ry, W: Wd, H: H };
+    drawV(k, n);
+  }
+
+  function drawV(k, n) {
+    var S = SYS[st.sys], P = setup($('lV'), 0.6), ctx = P.ctx, Wd = P.w, H = P.h;
+    var padL = 44, padB = 26, padT = 10, padR = 10, lo = -8, hi = 2;
+    var X = function (t) { return padL + t / S.T * (Wd - padL - padR); };
+    var Y = function (v) { v = Math.max(lo, Math.min(hi, v)); return padT + (hi - v) / (hi - lo) * (H - padT - padB); };
+    ctx.clearRect(0, 0, Wd, H); ctx.font = '11px "IBM Plex Mono", monospace'; ctx.fillStyle = '#5A6270'; ctx.strokeStyle = '#E3E6EA'; ctx.lineWidth = 1;
+    for (var e = lo; e <= hi; e += 2) { ctx.beginPath(); ctx.moveTo(padL, Y(e)); ctx.lineTo(Wd - padR, Y(e)); ctx.stroke(); ctx.fillText('1e' + e, 4, Y(e) + 4); }
+    for (var tt = 0; tt <= S.T; tt += 2) ctx.fillText(String(tt), X(tt) - 4, H - 8);
+    var V0 = st.V[0];
+    if (st.c !== null && isFinite(st.c) && V0 > 0) {
+      var c = st.c, w0 = Math.sqrt(V0), g = 2 * Math.sqrt(st.p22) * st.du;
+      ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#C2410C'; ctx.lineWidth = 2; ctx.beginPath();
+      for (var q = 0; q <= 80; q++) {
+        var t = S.T * q / 80, e2 = Math.exp(c * t / 2), w = e2 * w0 + (c < 0 ? g / (-c) * (1 - e2) : g * t), v = Math.log10(w * w / V0);
+        if (q === 0) ctx.moveTo(X(t), Y(v)); else ctx.lineTo(X(t), Y(v));
+      }
+      ctx.stroke();
+      if (c < 0 && st.du > 0) {
+        var vb = Math.log10((g / -c) * (g / -c) / V0); ctx.strokeStyle = '#0F6E5C'; ctx.setLineDash([2, 3]);
+        ctx.beginPath(); ctx.moveTo(padL, Y(vb)); ctx.lineTo(Wd - padR, Y(vb)); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    ctx.strokeStyle = '#0B5CAD'; ctx.lineWidth = 2.5; ctx.beginPath();
+    for (var q2 = 0; q2 <= k; q2 += 4) { var r = st.V[q2] / V0, v2 = isFinite(r) && r > 0 ? Math.log10(r) : hi; if (q2 === 0) ctx.moveTo(X(q2 * DT), Y(v2)); else ctx.lineTo(X(q2 * DT), Y(v2)); }
+    ctx.stroke();
+  }
+
+  function visible() { var r = $('lphase').getBoundingClientRect(); return r.bottom > -200 && r.top < window.innerHeight + 200; }
+  function loop() {
+    var n = Math.round(SYS[st.sys].T / DT);
+    if (st.playing && visible()) { st.frame += 4; if (st.frame > n + 150) st.frame = 0; draw(); }
+    requestAnimationFrame(loop);
+  }
+
+  $('lsys').addEventListener('change', function (e) {
+    st.sys = e.target.value; buildParams(); setP(0, 1); $('lpd').textContent = '';
+    st.a = [-2, 1.5]; st.b = [2, -1.2]; run(true);
+  });
+  $('lp12').addEventListener('input', function (e) { st.p12 = parseFloat(e.target.value); $('lp12o').textContent = st.p12.toFixed(2); run(false); });
+  $('lp22').addEventListener('input', function (e) { st.p22 = Math.pow(10, parseFloat(e.target.value)); $('lp22o').textContent = st.p22.toFixed(2); run(false); });
+  $('lauto').addEventListener('click', function () { $('lpd').textContent = ''; solveLyap(); });
+  $('lident').addEventListener('click', function () { $('lpd').textContent = ''; setP(0, 1); run(false); });
+  $('lU').addEventListener('input', function (e) { st.U = parseFloat(e.target.value); $('lUo').textContent = st.U.toFixed(2); run(false); });
+  $('ldu').addEventListener('input', function (e) { st.du = parseFloat(e.target.value); $('lduo').textContent = st.du.toFixed(2); run(false); });
+  $('lr').addEventListener('input', function (e) { st.r = parseFloat(e.target.value); $('lro').textContent = st.r.toFixed(2); certify(); draw(); });
+  $('lmap').addEventListener('change', function (e) { st.map = e.target.checked; draw(); });
+  $('lplay').addEventListener('click', function () {
+    st.playing = !st.playing; this.textContent = st.playing ? 'Pause' : 'Play';
+    if (!st.playing) { st.frame = Math.round(SYS[st.sys].T / DT); draw(); }
+  });
+  $('lnew').addEventListener('click', function () {
+    var R = SYS[st.sys].R, rnd = function () { return (Math.random() * 2 - 1) * R * 0.8; };
+    st.a = [rnd(), rnd()]; st.b = [rnd(), rnd()]; run(true);
+  });
+  $('lphase').addEventListener('click', function (e) {
+    if (!st.view) return; var r = this.getBoundingClientRect(), v = st.view;
+    var x = (e.clientX - r.left) / v.W * 2 * v.Rx - v.Rx, y = v.Ry - (e.clientY - r.top) / v.H * 2 * v.Ry;
+    if (st.pick === 0) st.a = [x, y]; else st.b = [x, y]; st.pick = 1 - st.pick; run(true);
+  });
+  window.addEventListener('resize', draw);
+
+  buildParams(); setP(0, 1); run(true); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
