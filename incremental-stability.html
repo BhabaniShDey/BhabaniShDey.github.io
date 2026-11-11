@@ -269,6 +269,14 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
 <div class="verdict" id="lverdict" aria-live="polite"></div>
 </div>
 </div>
+<div class="card">
+<div class="plothead">
+<span class="label">3D view — V(δ) over the difference δ = x − x̂ · drag to rotate</span>
+<button type="button" class="btn" id="l3reset" style="min-height:32px;padding:0 10px;font-size:13px">Reset view</button>
+</div>
+<canvas id="l3d" height="420" style="cursor:grab;touch-action:none" aria-label="3D surface of the incremental Lyapunov function V over the difference between the two states, with the path of the pair sliding down the surface"></canvas>
+<div class="legend" style="margin-top:8px"><span><i style="background:#0B5CAD"></i>V falling along the pair</span><span><i style="background:#B42318"></i>V rising</span><span><i style="background:#8A93A0"></i>shadow of δ(t) on the floor</span><span><i style="background:#0F6E5C"></i>δ-ISS ultimate level</span></div>
+</div>
 </div>
 </div>
 
@@ -297,6 +305,7 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
 <p><strong>The right P.</strong> In the linear system, P = I fails because A = [−1 4; 0 −1] is not normal. Press “Solve AᵀP + PA = −I” and the certificate appears.</p>
 <p><strong>Local, not global.</strong> For the pendulum, cos x₁ changes sign beyond |x₁| = π/2, so no constant P works everywhere. Shrink the box r to find where V is a valid certificate.</p>
 <p><strong>δ-ISS.</strong> Raise δu: the pair stops converging but stays inside the green bound, which scales linearly with δu.</p>
+<p><strong>In 3D.</strong> The pair is a ball sliding down the bowl V(δ). With a valid certificate it only goes down; with P = I on the linear system, watch it climb (red) before it falls.</p>
 </div>
 </div>
 </section>
@@ -810,6 +819,7 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
     ctx.fillText('next click sets ' + (st.pick === 0 ? 'x(0)' : 'x̂(0)'), Wd - 170, H - 10);
     st.view = { Rx: Rx, Ry: Ry, W: Wd, H: H };
     drawV(k, n);
+    draw3d(k, n);
   }
 
   function drawV(k, n) {
@@ -840,7 +850,99 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
     ctx.stroke();
   }
 
-  function visible() { var r = $('lphase').getBoundingClientRect(); return r.bottom > -200 && r.top < window.innerHeight + 200; }
+  /* ---------- 3D view of V(δ) ---------- */
+  var view3 = { az: -0.75, el: 0.55 };
+  function draw3d(k, n) {
+    var P = setup($('l3d'), 0.56), ctx = P.ctx, Wd = P.w, H = P.h;
+    ctx.clearRect(0, 0, Wd, H);
+    if (!pd()) { ctx.fillStyle = '#8A1C12'; ctx.font = '14px "IBM Plex Sans", sans-serif'; ctx.fillText('P is not positive definite, so V is not a bowl.', 16, 28); return; }
+    var D = 0;
+    for (var q = 0; q <= n; q += 5) { var a1 = Math.abs(st.ta[2 * q] - st.tb[2 * q]), a2 = Math.abs(st.ta[2 * q + 1] - st.tb[2 * q + 1]); if (isFinite(a1) && a1 > D) D = a1; if (isFinite(a2) && a2 > D) D = a2; }
+    D = Math.max(D * 1.1, 0.2);
+    var Vref = 0; [[1, 1], [1, -1], [-1, 1], [-1, -1], [1, 0], [0, 1]].forEach(function (c) { var v = Vof(c[0] * D, c[1] * D); if (v > Vref) Vref = v; });
+    var ca = Math.cos(view3.az), sa = Math.sin(view3.az), ce = Math.cos(view3.el), se = Math.sin(view3.el);
+    /* fit the box [-1,1]² × [0, 1.25] (plus axis labels) into the canvas at the current angle */
+    var raw = function (X, Y, Z) { var x = ca * X - sa * Y, y = sa * X + ca * Y; return [x, -(Z * ce + y * se), y * ce - Z * se]; };
+    var mnx = Infinity, mxx = -Infinity, mny = Infinity, mxy = -Infinity;
+    [-1.2, 1.2].forEach(function (X) { [-1.2, 1.2].forEach(function (Y) { [0, 1.4].forEach(function (Z) { var r0 = raw(X, Y, Z); mnx = Math.min(mnx, r0[0]); mxx = Math.max(mxx, r0[0]); mny = Math.min(mny, r0[1]); mxy = Math.max(mxy, r0[1]); }); }); });
+    var pad = 22, sc = Math.min((Wd - 2 * pad) / (mxx - mnx), (H - 2 * pad - 14) / (mxy - mny));
+    var cx = Wd / 2 - sc * (mnx + mxx) / 2, cy = H / 2 - 7 - sc * (mny + mxy) / 2;
+    function pr(X, Y, Z) { var r0 = raw(X, Y, Z); return [cx + sc * r0[0], cy + sc * r0[1], r0[2]]; }
+    function zOf(d1, d2) { return 1.25 * Vof(d1, d2) / Vref; }
+    /* floor grid + contour rings */
+    ctx.strokeStyle = '#E3E6EA'; ctx.lineWidth = 1;
+    for (var g = -1; g <= 1.0001; g += 0.5) {
+      var A = pr(g, -1, 0), B = pr(g, 1, 0), C = pr(-1, g, 0), E = pr(1, g, 0);
+      ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.moveTo(C[0], C[1]); ctx.lineTo(E[0], E[1]); ctx.stroke();
+    }
+    var L22 = Math.sqrt(st.p22 - st.p12 * st.p12);
+    function ring(V, z, style, width) {
+      var s0 = Math.sqrt(V); ctx.strokeStyle = style; ctx.lineWidth = width; ctx.beginPath();
+      for (var m = 0; m <= 90; m++) { var th = m / 90 * 2 * Math.PI, w2 = Math.sin(th) / L22, w1 = Math.cos(th) - st.p12 * w2;
+        var pt = pr(s0 * w1 / D, s0 * w2 / D, z); if (m === 0) ctx.moveTo(pt[0], pt[1]); else ctx.lineTo(pt[0], pt[1]); }
+      ctx.stroke();
+    }
+    [0.1, 0.3, 0.55, 0.8].forEach(function (f) { ring(f * Vref * 0.5, 0, '#D5DAE0', 1); });
+    /* surface quads, painter's order */
+    var N = 26, quads = [];
+    for (var i = 0; i < N; i++) for (var j = 0; j < N; j++) {
+      var x0 = -1 + 2 * i / N, x1 = -1 + 2 * (i + 1) / N, y0 = -1 + 2 * j / N, y1 = -1 + 2 * (j + 1) / N;
+      var cs = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(function (c) { return pr(c[0], c[1], zOf(c[0] * D, c[1] * D)); });
+      var zm = zOf((x0 + x1) / 2 * D, (y0 + y1) / 2 * D);
+      quads.push({ c: cs, d: (cs[0][2] + cs[1][2] + cs[2][2] + cs[3][2]) / 4, z: zm });
+    }
+    quads.sort(function (a, b) { return b.d - a.d; });
+    quads.forEach(function (Q) {
+      var t = Math.min(1, Q.z / 1.25), r = Math.round(238 - 40 * t), gg = Math.round(243 - 30 * t), b = Math.round(250 - 12 * t);
+      ctx.fillStyle = 'rgba(' + r + ',' + gg + ',' + b + ',0.82)'; ctx.strokeStyle = 'rgba(157,179,207,0.55)'; ctx.lineWidth = 0.7;
+      ctx.beginPath(); ctx.moveTo(Q.c[0][0], Q.c[0][1]); for (var m = 1; m < 4; m++) ctx.lineTo(Q.c[m][0], Q.c[m][1]); ctx.closePath(); ctx.fill(); ctx.stroke();
+    });
+    /* δ-ISS level */
+    if (st.c !== null && st.c < 0 && st.du > 0) {
+      var gI = 2 * Math.sqrt(st.p22) * st.du / (-st.c), VI = gI * gI;
+      if (VI < Vref) { ctx.save(); ctx.setLineDash([5, 4]); ring(VI, 1.25 * VI / Vref, '#0F6E5C', 2); ctx.restore(); }
+    }
+    /* path of δ(t): shadow, then the curve on the bowl */
+    var pts = [];
+    for (var q2 = 0; q2 <= k; q2 += 3) { var d1 = st.ta[2 * q2] - st.tb[2 * q2], d2 = st.ta[2 * q2 + 1] - st.tb[2 * q2 + 1]; if (!isFinite(d1) || !isFinite(d2)) break; pts.push([d1 / D, d2 / D, 1.25 * st.V[q2] / Vref, st.V[q2]]); }
+    ctx.strokeStyle = '#8A93A0'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); ctx.beginPath();
+    pts.forEach(function (pp, idx) { var s2 = pr(pp[0], pp[1], 0); if (idx === 0) ctx.moveTo(s2[0], s2[1]); else ctx.lineTo(s2[0], s2[1]); });
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.lineWidth = 3;
+    for (var m2 = 1; m2 < pts.length; m2++) {
+      var a = pr(pts[m2 - 1][0], pts[m2 - 1][1], pts[m2 - 1][2]), b2 = pr(pts[m2][0], pts[m2][1], pts[m2][2]);
+      ctx.strokeStyle = pts[m2][3] > pts[m2 - 1][3] * 1.0005 ? '#B42318' : '#0B5CAD';
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b2[0], b2[1]); ctx.stroke();
+    }
+    if (pts.length) {
+      var s0p = pts[0], p0 = pr(s0p[0], s0p[1], s0p[2]);
+      ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = '#0B5CAD'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p0[0], p0[1], 5, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+      var last = pts[pts.length - 1], pl = pr(last[0], last[1], last[2]), fl = pr(last[0], last[1], 0);
+      ctx.strokeStyle = '#5A6270'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pl[0], pl[1]); ctx.lineTo(fl[0], fl[1]); ctx.stroke();
+      ctx.fillStyle = '#C2410C'; ctx.beginPath(); ctx.arc(pl[0], pl[1], 7, 0, 2 * Math.PI); ctx.fill();
+      ctx.fillStyle = '#14181F'; ctx.font = '12px "IBM Plex Mono", monospace';
+      ctx.fillText('V = ' + last[3].toExponential(2), pl[0] + 12, pl[1] - 8);
+    }
+    /* axes labels */
+    ctx.fillStyle = '#5A6270'; ctx.font = '13px "IBM Plex Mono", monospace';
+    var lx = pr(1.15, 0, 0), ly = pr(0, 1.15, 0), lz = pr(0, 0, 1.4), o = pr(0, 0, 0);
+    ctx.strokeStyle = '#5A6270'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(o[0], o[1]); ctx.lineTo(lz[0], lz[1]); ctx.stroke();
+    ctx.fillText('δ₁', lx[0], lx[1]); ctx.fillText('δ₂', ly[0], ly[1]); ctx.fillText('V(δ)', lz[0] + 6, lz[1]);
+    ctx.fillText('|δ| ≤ ' + D.toFixed(2), 10, H - 10);
+  }
+  (function () {
+    var cv = $('l3d'), drag = null;
+    cv.addEventListener('pointerdown', function (e) { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; });
+    cv.addEventListener('pointermove', function (e) {
+      if (!drag) return; view3.az -= (e.clientX - drag[0]) * 0.01; view3.el = Math.max(0.12, Math.min(1.35, view3.el + (e.clientY - drag[1]) * 0.006));
+      drag = [e.clientX, e.clientY]; if (!st.playing) draw();
+    });
+    var end = function () { drag = null; cv.style.cursor = 'grab'; };
+    cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+    $('l3reset').addEventListener('click', function () { view3.az = -0.75; view3.el = 0.55; draw(); });
+  })();
+
+  function visible() { var a = $('lphase').getBoundingClientRect(), b = $('l3d').getBoundingClientRect(); return b.bottom > -200 && a.top < window.innerHeight + 200; }
   function loop() {
     var n = Math.round(SYS[st.sys].T / DT);
     if (st.playing && visible()) { st.frame += 4; if (st.frame > n + 150) st.frame = 0; draw(); }
