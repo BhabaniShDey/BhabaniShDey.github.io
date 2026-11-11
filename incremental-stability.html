@@ -71,6 +71,15 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
 .check{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--ink2);min-height:32px}
 .check input{width:18px;height:18px;accent-color:var(--accent)}
 .warn{font-size:13px;color:#8A1C12}
+.pipe{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:16px}
+.pipe > div{min-width:0;display:flex;flex-direction:column;gap:8px}
+.pipe .eq{margin:0;white-space:pre;flex:1;font-size:13px}
+.pipe .step3{grid-column:1 / -1;flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px 20px}
+.pipe .step3 .label{flex-basis:100%}
+.pipe .step3 .eq{flex:0 1 auto}
+.pipe .step3 .small{flex:1 1 220px}
+.label.nt,.stat .label{text-transform:none;letter-spacing:.03em}
+.pipe .small{font-size:13px;color:var(--ink2)}
 @media (max-width:640px){h1{font-size:34px}.panel{max-width:none}.stop h2{font-size:26px}}
 </style>
 </head>
@@ -98,20 +107,19 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
 <section class="stop" id="stop-contraction" aria-labelledby="h-stop1">
 <span class="kicker">Stop 1</span>
 <h2 id="h-stop1">Contraction and matrix measures</h2>
-<p>Pick a system, change its parameters and the metric, and watch whether neighbouring trajectories converge to each other, and whether the matrix-measure test can certify it.</p>
+<p>Start from a nonlinear system ẋ = f(x, t). Differentiate it to get the Jacobian J(x, t) = ∂f/∂x, which governs how two nearby trajectories move relative to each other. If the matrix measure of J is negative everywhere, in some metric Θ, every pair of trajectories converges. The dashboard below walks through these steps live.</p>
 
 <div class="lab" aria-label="Contraction demo">
 <form class="panel" id="controls" onsubmit="return false">
 <div class="row">
 <label class="label" for="sys">System</label>
 <select id="sys">
-<option value="linear">Linear system  ẋ = Ax</option>
 <option value="tanh">Forced nonlinear network</option>
 <option value="vdp">Van der Pol oscillator</option>
 <option value="switched">State-dependent switched system</option>
+<option value="linear">Linear system  ẋ = Ax (for comparison)</option>
 </select>
 </div>
-<div class="eq" id="eqn" aria-live="polite"></div>
 <div class="row" id="params"></div>
 <div class="row">
 <span class="label">Matrix measure</span>
@@ -138,11 +146,20 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
 
 <div class="stage">
 <div class="card">
+<div class="pipe">
+<div><span class="label nt">1 · Nonlinear system ẋ = f(x, t)</span><div class="eq" id="eqn" aria-live="polite"></div></div>
+<div><span class="label nt">2 · Jacobian J = ∂f/∂x</span><div class="eq" id="jsym"></div></div>
+<div class="step3"><span class="label nt">3 · Evaluate J and its matrix measure at a point</span><div class="eq" id="jnum" aria-live="polite"></div><span class="small" id="jpt"></span></div>
+</div>
+</div>
+<div class="card">
 <div class="plothead">
-<span class="label">Phase plane — click to add an initial condition</span>
+<span class="label nt">4 · Where is μ(ΘJΘ⁻¹) &lt; 0? Hover to probe, click to add an initial condition</span>
 <span class="mono" id="clock" style="font-size:13px;color:var(--muted)">t = 0.00</span>
 </div>
-<canvas id="phase" height="520" aria-label="Phase plane showing the vector field and trajectories of the selected system"></canvas>
+<canvas id="phase" height="520" aria-label="Phase plane showing the vector field, trajectories and a map of the sign of the matrix measure of the Jacobian"></canvas>
+<div class="legend" style="margin-top:8px"><span><i style="background:rgba(11,92,173,.35)"></i>μ(ΘJΘ⁻¹) &lt; 0: contracting here</span><span><i style="background:rgba(180,35,24,.35)"></i>μ ≥ 0: not certified here</span><span><i style="background:#14181F"></i>probe point</span>
+<label class="check" style="min-height:0;margin-left:auto"><input type="checkbox" id="mumap" checked> Show map</label></div>
 </div>
 <div class="plots">
 <div class="card">
@@ -151,7 +168,7 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
 <div class="legend" style="margin-top:8px"><span><i style="background:#0B5CAD"></i>max ‖xᵢ(t) − xⱼ(t)‖ / D(0)</span><span><i style="background:#C2410C"></i>bound K e^{ct}</span></div>
 </div>
 <div class="card" style="display:flex;flex-direction:column;gap:12px">
-<span class="label">Certificate over the shown region</span>
+<span class="label nt">5 · Certificate: sup of μ over the shown region</span>
 <div class="stats">
 <div class="stat" id="s1"><span class="label">sup μ₁</span><span class="v">—</span></div>
 <div class="stat sel" id="s2"><span class="label">sup μ₂</span><span class="v">—</span></div>
@@ -179,6 +196,7 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
 </div>
 <div>
 <h2>Things to try</h2>
+<p><strong>Start nonlinear.</strong> In the forced network, J depends on the state through sech²(x) and sech²(y). Hover over the plane to see J and μ change point by point; lower a below b/2 and red patches appear where trajectories can separate.</p>
 <p><strong>Metric matters.</strong> In the linear system, A = [−1 4; 0 −1] is Hurwitz but μ₂(A) &gt; 0. Increase s above 2 and the certificate appears.</p>
 <p><strong>Entrainment.</strong> In the forced network, contracting systems forget initial conditions and lock onto a single periodic response to the input.</p>
 <p><strong>Not contracting.</strong> Van der Pol trajectories reach the same limit cycle but keep their phase difference — the spread never decays.</p>
@@ -329,7 +347,8 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
       ],
       f: function (x, y, t, p) { return [p.a11 * x + p.a12 * y, p.a21 * x + p.a22 * y]; },
       J: function (x, y, t, p) { return [[p.a11, p.a12], [p.a21, p.a22]]; },
-      hint: 'A = [−1 4; 0 −1] is Hurwitz, yet μ₂(A) = 1 > 0: trajectories first spread apart. Slide s past 2 — a weighted metric certifies contraction.'
+      jsym: 'J = ⎡ a₁₁  a₁₂ ⎤\n    ⎣ a₂₁  a₂₂ ⎦\nconstant: the same everywhere',
+      hint: 'For comparison: a linear system has a constant Jacobian. A = [−1 4; 0 −1] is Hurwitz, yet μ₂(A) = 1 > 0. Slide s past 2 and a weighted metric certifies contraction.'
     },
     tanh: {
       eq: 'ẋ = −a x + b tanh(y) + A sin(ωt)\nẏ = −a y − b tanh(x)',
@@ -342,7 +361,8 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
       ],
       f: function (x, y, t, p) { return [-p.a * x + p.b * Math.tanh(y) + p.A * Math.sin(p.w * t), -p.a * y - p.b * Math.tanh(x)]; },
       J: function (x, y, t, p) { return [[-p.a, p.b * sech2(y)], [-p.b * sech2(x), -p.a]]; },
-      hint: 'μ₂(J) ≤ −a + b/2, so the network contracts when a > b/2. Then every trajectory locks onto the same periodic response to the input. Lower a to lose the guarantee.'
+      jsym: 'J(x, y) = ⎡ −a           b sech²(y) ⎤\n          ⎣ −b sech²(x)  −a         ⎦\nsech² ∈ (0, 1], input drops out',
+      hint: 'Differentiating removes the input A sin(ωt), so J depends only on the state. Since 0 < sech² ≤ 1, μ₂(J) ≤ −a + b/2: the network contracts when a > b/2 and every trajectory locks onto the same periodic response. Lower a to lose the guarantee.'
     },
     vdp: {
       eq: 'ẋ = y\nẏ = μ(1 − x²) y − x',
@@ -350,7 +370,8 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
       params: [{ k: 'mu', label: 'μ', min: 0.1, max: 3, step: 0.05, v: 1 }],
       f: function (x, y, t, p) { return [y, p.mu * (1 - x * x) * y - x]; },
       J: function (x, y, t, p) { return [[0, 1], [-2 * p.mu * x * y - 1, p.mu * (1 - x * x)]]; },
-      hint: 'A stable limit cycle is not contraction: trajectories reach the same orbit but keep their phase lag, so the spread stays bounded away from zero.'
+      jsym: 'J(x, y) = ⎡ 0             1          ⎤\n          ⎣ −2μxy − 1     μ(1 − x²)  ⎦\nJ₂₂ > 0 inside |x| < 1',
+      hint: 'J₂₂ = μ(1 − x²) is positive inside the strip |x| < 1, so μ(J) > 0 there in every metric: no constant Θ can certify contraction. Trajectories reach the same limit cycle but keep their phase lag.'
     },
     switched: {
       eq: 'ẋ = A₁x  if x₁ ≥ 0,  A₂x  otherwise\nA₁ = [−a 3; −3 −a],  A₂ = [−a 1; −4 −a]',
@@ -359,12 +380,13 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
       mode: function (x) { return x >= 0 ? 0 : 1; },
       f: function (x, y, t, p) { return x >= 0 ? [-p.a * x + 3 * y, -3 * x - p.a * y] : [-p.a * x + y, -4 * x - p.a * y]; },
       J: function (x, y, t, p) { return x >= 0 ? [[-p.a, 3], [-3, -p.a]] : [[-p.a, 1], [-4, -p.a]]; },
-      hint: 'μ₂(A₁) = −a and μ₂(A₂) = −a + 1.5. A common metric with both measures negative is a sufficient condition (plus compatibility at the switching surface x₁ = 0).'
+      jsym: 'J = A₁ = ⎡ −a  3 ⎤  for x ≥ 0\n         ⎣ −3  −a ⎦\nJ = A₂ = ⎡ −a  1 ⎤  for x < 0\n         ⎣ −4  −a ⎦',
+      hint: 'The Jacobian is piecewise constant and jumps at the switching surface x = 0. μ₂(A₁) = −a and μ₂(A₂) = −a + 1.5; a common metric with both measures negative is a sufficient condition (plus compatibility at the surface).'
     }
   };
 
   var $ = function (id) { return document.getElementById(id); };
-  var state = { sys: 'linear', p: {}, measure: '2', s: 1, n: 8, ics: [], traj: [], spread: [], frame: 0, playing: true, cert: null, emp: null };
+  var state = { sys: 'tanh', p: {}, measure: '2', s: 1, n: 8, hover: null, map: true, ics: [], traj: [], spread: [], frame: 0, playing: true, cert: null, emp: null };
 
   function mu(A, kind) {
     var a = A[0][0], b = A[0][1], c = A[1][0], d = A[1][1];
@@ -394,7 +416,7 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
       });
     });
     $('eqn').textContent = S.eq;
-    $('eqn').style.whiteSpace = 'pre';
+    $('jsym').textContent = S.jsym;
     $('hint').textContent = S.hint;
   }
 
@@ -491,6 +513,15 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
     var Rx = R * Math.max(1, W / H), Ry = R * Math.max(1, H / W);
     var X = function (x) { return (x + Rx) / (2 * Rx) * W; }, Y = function (y) { return H - (y + Ry) / (2 * Ry) * H; };
     ctx.clearRect(0, 0, W, H);
+    if (state.map) {
+      var GM = 44, cw = W / GM, rows = Math.ceil(H / cw);
+      for (var mi = 0; mi < GM; mi++) for (var mj = 0; mj < rows; mj++) {
+        var mx = -Rx + 2 * Rx * (mi + 0.5) / GM, my = Ry - (mj + 0.5) * cw / H * 2 * Ry;
+        var mv = mu(weighted(S.J(mx, my, t, state.p), state.s), state.measure), al = Math.min(0.3, 0.07 + Math.abs(mv) * 0.06);
+        ctx.fillStyle = mv < 0 ? 'rgba(11,92,173,' + al + ')' : 'rgba(180,35,24,' + al + ')';
+        ctx.fillRect(mi * cw, mj * cw, cw + 0.5, cw + 0.5);
+      }
+    }
     ctx.strokeStyle = '#E3E6EA'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, Y(0)); ctx.lineTo(W, Y(0)); ctx.moveTo(X(0), 0); ctx.lineTo(X(0), H); ctx.stroke();
     if (state.sys === 'switched') {
@@ -531,7 +562,26 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
       if (!isNaN(cx) && !isNaN(cy)) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(X(cx), Y(cy), 5.5, 0, 2 * Math.PI); ctx.fill(); }
     });
     state.view = { Rx: Rx, Ry: Ry, W: W, H: H };
+    /* probe: the hovered point, else the first trajectory's current position */
+    var pxy = state.hover || (state.traj[0] && !isNaN(state.traj[0][2 * k]) ? [state.traj[0][2 * k], state.traj[0][2 * k + 1]] : [0, 0]);
+    probe(pxy[0], pxy[1], t);
+    ctx.strokeStyle = '#14181F'; ctx.lineWidth = 2; ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath(); ctx.arc(X(pxy[0]), Y(pxy[1]), 7, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(X(pxy[0]) - 11, Y(pxy[1])); ctx.lineTo(X(pxy[0]) + 11, Y(pxy[1])); ctx.moveTo(X(pxy[0]), Y(pxy[1]) - 11); ctx.lineTo(X(pxy[0]), Y(pxy[1]) + 11); ctx.stroke();
     drawSpread(k, steps);
+  }
+
+  function probe(x, y, t) {
+    var S = SYSTEMS[state.sys], J = S.J(x, y, t, state.p), Jw = weighted(J, state.s);
+    var f2 = function (v) { var s0 = (v < 0 ? '−' : ' ') + Math.abs(v).toFixed(2); return ('       ' + s0).slice(-7); };
+    var name = state.measure === 'inf' ? 'μ∞' : (state.measure === '1' ? 'μ₁' : 'μ₂');
+    var m = mu(Jw, state.measure);
+    var txt = 'J = ⎡' + f2(J[0][0]) + f2(J[0][1]) + ' ⎤\n    ⎣' + f2(J[1][0]) + f2(J[1][1]) + ' ⎦';
+    if (state.s !== 1) txt += '\nΘJΘ⁻¹ = ⎡' + f2(Jw[0][0]) + f2(Jw[0][1]) + ' ⎤\n        ⎣' + f2(Jw[1][0]) + f2(Jw[1][1]) + ' ⎦';
+    txt += '\n' + name + '(ΘJΘ⁻¹) = ' + (m < 0 ? '−' : '+') + Math.abs(m).toFixed(3);
+    $('jnum').textContent = txt;
+    $('jpt').textContent = (state.hover ? 'Hovered point' : 'Following the first trajectory') + ' (x, y) = (' + x.toFixed(2) + ', ' + y.toFixed(2) + '): ' + (m < 0 ? 'nearby trajectories approach each other here.' : 'nearby trajectories may separate here.');
+    $('jnum').style.background = m < 0 ? '#E7F4F0' : '#FDECEA';
   }
 
   function drawSpread(k, steps) {
@@ -595,6 +645,13 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
     state.ics.push([x, y]); if (state.ics.length > 16) state.ics.shift();
     simulate(true);
   });
+  $('phase').addEventListener('mousemove', function (e) {
+    if (!state.view) return; var r = this.getBoundingClientRect(), v = state.view;
+    state.hover = [(e.clientX - r.left) / v.W * 2 * v.Rx - v.Rx, v.Ry - (e.clientY - r.top) / v.H * 2 * v.Ry];
+    if (!state.playing) draw();
+  });
+  $('phase').addEventListener('mouseleave', function () { state.hover = null; if (!state.playing) draw(); });
+  $('mumap').addEventListener('change', function (e) { state.map = e.target.checked; draw(); });
   window.addEventListener('resize', draw);
 
   buildParams(); randomICs(); simulate(true); requestAnimationFrame(loop);
