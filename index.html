@@ -7,13 +7,18 @@
 <meta name="description" content="Bhabani Shankar Dey, Assistant Professor (Research), School of Electrical Engineering, VIT Vellore. Research in human–robot collaboration, Sim2Real, safe control for unknown systems and contraction theory.">
 <meta property="og:title" content="Bhabani Shankar Dey">
 <meta property="og:description" content="Nonlinear control · Safe autonomy · Human–robot collaboration">
-<meta property="og:image" content="images/headshot.jpg">
+<meta property="og:image" content="images/portrait-headshot.jpg">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap">
 <style>
 html{scroll-behavior:smooth}body{margin:0;background:#FFFFFF}
 a{color:#0B5CAD}a:hover{color:#083F78}
+.portrait{position:relative;flex:1 1 280px;max-width:340px;margin:0 auto;aspect-ratio:1/1}
+.portrait::before{content:"";position:absolute;inset:0;border-radius:50%;background:#EEF3FA;transform:translate(20px,16px)}
+.portrait::after{content:"";position:absolute;inset:-12px;border-radius:50%;border:1.5px solid #C9D9EE;pointer-events:none}
+.portrait img{position:relative;display:block;width:100%;height:100%;box-sizing:border-box;border-radius:50%;object-fit:cover;border:6px solid #FFFFFF;box-shadow:0 0 0 1px #E3E6EA,0 18px 40px rgba(20,24,31,.14)}
+@media (max-width:640px){.portrait{max-width:260px}}
 </style>
 </head>
 <body>
@@ -48,8 +53,8 @@ a{color:#0B5CAD}a:hover{color:#083F78}
 <a href="mailto:bhabani.shankar@vit.ac.in" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; box-sizing: border-box; padding: 0 16px; border: 1px solid #CDD2D9; border-radius: 6px; text-decoration: none; color: #14181F; font-size: 15px; font-weight: 500">Email</a>
 </div>
 </div>
-<figure style="flex: 1 1 300px; max-width: 380px; margin: 0">
-<img src="images/headshot.jpg" alt="Portrait of Bhabani Shankar Dey" style="display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 10px">
+<figure class="portrait">
+<img src="images/portrait-headshot.jpg" alt="Portrait of Bhabani Shankar Dey" width="840" height="840">
 </figure>
 </section>
 
