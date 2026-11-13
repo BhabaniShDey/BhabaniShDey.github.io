@@ -394,6 +394,14 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
 <div class="verdict" id="kverdict" aria-live="polite"></div>
 </div>
 </div>
+<div class="card">
+<div class="plothead">
+<span class="label nt">Area of the patch over the whole run (linear scale)</span>
+<span class="mono" id="karealab" style="font-size:13px;color:var(--muted)"></span>
+</div>
+<canvas id="kareaLin" height="260" aria-label="Area of the patch of initial conditions as a percentage of its starting area, over the full simulation time, with the 2-contraction bound and a marker at the current time"></canvas>
+<div class="legend" style="margin-top:8px"><span><i style="background:#0F6E5C"></i>area(t) as % of area(0)</span><span><i style="background:#C2410C"></i>2-contraction bound e^{ct}</span><span><i style="background:#14181F"></i>current time in the animation</span></div>
+</div>
 </div>
 </div>
 
@@ -1322,7 +1330,49 @@ footer p{max-width:1160px;margin:0 auto;padding:20px 24px;font-size:13px;color:v
     drawArea(k, n);
   }
 
+  function drawAreaLin(k, n) {
+    var S = SYS[st.sys], P = setup($('kareaLin'), 0.3), ctx = P.ctx, W = P.w, H = P.h;
+    if (window.innerWidth < 640) { P = setup($('kareaLin'), 0.6); ctx = P.ctx; W = P.w; H = P.h; }
+    var A0 = st.area[0], r = function (q) { var v = st.area[q] / A0; return isFinite(v) ? v : 0; };
+    var top = 1; for (var q = 0; q <= n; q += 2) top = Math.max(top, r(q)); top = top * 1.08;
+    var raw = top / 4, p10 = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map(function (f) { return f * p10; }).filter(function (v) { return v >= raw; })[0];
+    var padL = 56, padR = 14, padT = 12, padB = 30;
+    var X = function (t) { return padL + t / S.T * (W - padL - padR); };
+    var Y = function (v) { return padT + (1 - Math.min(v, top) / top) * (H - padT - padB); };
+    ctx.clearRect(0, 0, W, H); ctx.font = '11px "IBM Plex Mono", monospace'; ctx.lineWidth = 1;
+    for (var g = 0; g <= top + 1e-9; g += step) { ctx.strokeStyle = g === 1 ? '#CDD2D9' : '#EEF0F3'; ctx.beginPath(); ctx.moveTo(padL, Y(g)); ctx.lineTo(W - padR, Y(g)); ctx.stroke(); ctx.fillStyle = '#5A6270'; ctx.fillText((g * 100 >= 1000 ? Math.round(g * 100).toLocaleString('en-IN') : Math.round(g * 100)) + '%', 4, Y(g) + 4); }
+    for (var tt = 0; tt <= S.T + 1e-9; tt += (S.T > 10 ? 2 : 1)) { ctx.fillStyle = '#5A6270'; ctx.fillText(String(tt), X(tt) - 4, H - 10); }
+    /* filled area under the whole curve */
+    ctx.beginPath(); ctx.moveTo(X(0), Y(0));
+    for (var q2 = 0; q2 <= n; q2 += 3) ctx.lineTo(X(q2 * DT), Y(r(q2)));
+    ctx.lineTo(X(S.T), Y(0)); ctx.closePath(); ctx.fillStyle = 'rgba(15,110,92,.12)'; ctx.fill();
+    /* the part already played is drawn darker */
+    ctx.beginPath(); ctx.moveTo(X(0), Y(0));
+    for (var q3 = 0; q3 <= k; q3 += 3) ctx.lineTo(X(q3 * DT), Y(r(q3)));
+    ctx.lineTo(X(k * DT), Y(0)); ctx.closePath(); ctx.fillStyle = 'rgba(15,110,92,.22)'; ctx.fill();
+    ctx.strokeStyle = '#0F6E5C'; ctx.lineWidth = 2.5; ctx.beginPath();
+    for (var q4 = 0; q4 <= n; q4 += 3) { if (q4 === 0) ctx.moveTo(X(0), Y(r(0))); else ctx.lineTo(X(q4 * DT), Y(r(q4))); }
+    ctx.stroke();
+    if (st.sup !== null) {
+      ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#C2410C'; ctx.lineWidth = 2; ctx.beginPath();
+      for (var m = 0; m <= 120; m++) { var t = S.T * m / 120, v = Math.exp(st.sup * t); if (m === 0) ctx.moveTo(X(t), Y(v)); else ctx.lineTo(X(t), Y(v)); }
+      ctx.stroke(); ctx.restore();
+    }
+    /* half-area time */
+    var half = null; for (var q5 = 1; q5 <= n; q5++) if (r(q5) <= 0.5 && r(q5 - 1) > 0.5) { half = q5 * DT; break; }
+    if (half !== null) {
+      ctx.save(); ctx.setLineDash([2, 3]); ctx.strokeStyle = '#5A6270'; ctx.beginPath(); ctx.moveTo(X(half), Y(0.5)); ctx.lineTo(X(half), Y(0)); ctx.moveTo(padL, Y(0.5)); ctx.lineTo(X(half), Y(0.5)); ctx.stroke(); ctx.restore();
+      ctx.fillStyle = '#3D4552'; ctx.fillText('half the area by t = ' + half.toFixed(2), Math.min(X(half) + 6, W - 190), Y(0.5) - 6);
+    }
+    /* current time marker */
+    var tk = k * DT, vk = r(k);
+    ctx.strokeStyle = '#14181F'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(tk), padT); ctx.lineTo(X(tk), H - padB); ctx.stroke();
+    ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = '#0F6E5C'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(X(tk), Y(vk), 5.5, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+    $('karealab').textContent = 't = ' + tk.toFixed(2) + ' · area = ' + (vk * 100).toFixed(vk < 0.1 ? 2 : 1) + '% · at t = ' + S.T + ': ' + (r(n) * 100).toFixed(r(n) < 0.1 ? 2 : 1) + '%';
+  }
+
   function drawArea(k, n) {
+    drawAreaLin(k, n);
     var S = SYS[st.sys], P = setup($('karea'), 0.6), ctx = P.ctx, W = P.w, H = P.h;
     var padL = 44, padB = 26, padT = 10, padR = 10, lo = -6, hi = 2;
     var X = function (t) { return padL + t / S.T * (W - padL - padR); }, Y = function (v) { v = Math.max(lo, Math.min(hi, v)); return padT + (hi - v) / (hi - lo) * (H - padT - padB); };
