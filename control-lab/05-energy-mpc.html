@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Control Lab – energy</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"><style>:root{
+  --bg:#0b1020;--panel:#121a30;--panel2:#18223d;--ink:#e8edf7;--muted:#9aa7c2;--line:#26324f;--grid:#1d2742;
+  --sys:#4da3ff;--ctl:#ff9f43;--ok:#2ecc71;--err:#ff5d5d;--ai:#b48cff;--warn:#ffd166;
+  --radius:14px;font-size:16px;color-scheme:dark;
+}
+[data-theme=light]{
+  --bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2f8;--ink:#14203a;--muted:#55627f;--line:#d6dcea;--grid:#e6ebf4;
+  --sys:#1c6dd0;--ctl:#e07800;--ok:#14984a;--err:#d63031;--ai:#7a4ed6;--warn:#b7791f;color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
+h1,h2,h3{font-family:"Space Grotesk","Inter",system-ui,sans-serif;letter-spacing:-.01em;margin:0}
+a{color:var(--sys)}
+.cl-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+.cl-top h1{font-size:1.35rem}
+.cl-top .sub{color:var(--muted);font-size:.92rem}
+.cl-top .spacer{flex:1}
+.tag{display:inline-block;font-size:.75rem;font-weight:600;padding:3px 9px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.cl-app{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:14px;padding:14px;max-width:1500px;margin:0 auto}
+@media (max-width:980px){.cl-app{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.card h3{font-size:.95rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;font-weight:600}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.visual{position:relative;width:100%;aspect-ratio:16/7;border-radius:10px;overflow:hidden;background:var(--panel2)}
+.visual canvas{width:100%;height:100%;display:block;touch-action:none}
+.plots{display:grid;grid-template-columns:1fr;gap:10px}
+.plots.two{grid-template-columns:1fr 1fr}
+@media (max-width:700px){.plots.two{grid-template-columns:1fr}}
+.chart{position:relative;width:100%;height:150px}
+.chart canvas{width:100%;height:100%;display:block}
+.ctl-row{margin:8px 0 12px}
+.ctl-row label{display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:3px}
+.ctl-row label b{font-variant-numeric:tabular-nums;font-weight:600}
+input[type=range]{width:100%;accent-color:var(--ctl);height:22px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button.b{font:inherit;font-size:.88rem;font-weight:600;padding:7px 12px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);cursor:pointer}
+button.b:hover{border-color:var(--muted)}
+button.b.pri{background:var(--sys);border-color:var(--sys);color:#fff}
+button.b.warn{border-color:var(--err);color:var(--err)}
+button.b.on{outline:2px solid var(--ctl);outline-offset:1px}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:4px 0 10px}
+.seg button{flex:1;font:inherit;font-size:.85rem;padding:7px 6px;background:var(--panel2);color:var(--muted);border:0;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--sys);color:#fff;font-weight:600}
+.chk{display:flex;align-items:center;gap:8px;font-size:.9rem;margin:6px 0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.tile{background:var(--panel2);border-radius:10px;padding:8px 10px}
+.tile .k{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.tile .v{font-size:1.35rem;font-weight:700;font-variant-numeric:tabular-nums;font-family:"Space Grotesk",system-ui}
+.explain{font-size:.95rem}
+.explain p{margin:.3em 0}
+.guide .step{font-size:.93rem}
+.guide .n{color:var(--muted);font-size:.8rem}
+.guide .nav{display:flex;gap:8px;margin-top:8px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:.8rem;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-2px}
+.badge{font-weight:700;padding:4px 10px;border-radius:8px;font-size:.9rem}
+.kbd{font-family:ui-monospace,monospace;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:.85em}
+.muted{color:var(--muted)}
+.eq{font-family:"Cambria Math","STIX Two Math",Georgia,serif;font-size:1.05rem;background:var(--panel2);padding:6px 10px;border-radius:8px;display:inline-block}
+/* hub */
+.hub{max-width:1200px;margin:0 auto;padding:26px 18px 60px}
+.hub h1{font-size:2.2rem}
+.hub .lead{color:var(--muted);font-size:1.05rem;max-width:760px}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;margin-top:18px}
+.dcard{display:block;text-decoration:none;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--c);border-radius:var(--radius);padding:14px 16px;transition:transform .12s}
+.dcard:hover{transform:translateY(-2px);border-color:var(--c)}
+.dcard h2{font-size:1.15rem;margin:4px 0 6px}
+.dcard p{margin:0;color:var(--muted);font-size:.92rem}
+.dcard .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.sect{margin-top:30px;font-size:.85rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.colorkey{display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;font-size:.9rem}
+.colorkey span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--c);margin-right:6px;vertical-align:-1px}
+.overlay-msg{position:absolute;inset:auto 0 12px 0;text-align:center;pointer-events:none}
+.overlay-msg span{background:rgba(0,0,0,.6);color:#fff;padding:6px 14px;border-radius:99px;font-weight:600}
+</style></head>
+<body><div id="root"></div>
+<script>/* Control Lab — shared helpers (no external libraries) */
+window.APPS = window.APPS || {};
+const CL = (() => {
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const el = (tag, attrs = {}, kids = []) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (k === 'class') e.className = v;
+      else if (k === 'html') e.innerHTML = v;
+      else if (k === 'style') e.style.cssText = v;
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+      else e.setAttribute(k, v);
+    }
+    (Array.isArray(kids) ? kids : [kids]).forEach(c => c != null && e.append(c.nodeType ? c : document.createTextNode(c)));
+    return e;
+  };
+  let gaussSpare = null;
+  const randn = () => {
+    if (gaussSpare !== null) { const s = gaussSpare; gaussSpare = null; return s; }
+    let u = 0, v = 0; while (u === 0) u = Math.random(); v = Math.random();
+    const r = Math.sqrt(-2 * Math.log(u)); gaussSpare = r * Math.sin(2 * Math.PI * v); return r * Math.cos(2 * Math.PI * v);
+  };
+
+  function setTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    try { localStorage.setItem('cl-theme', t); } catch (e) {}
+  }
+  function initTheme() {
+    let t = 'dark'; try { t = localStorage.getItem('cl-theme') || 'dark'; } catch (e) {}
+    setTheme(t);
+  }
+
+  /* Page shell for one dashboard */
+  function shell(root, o) {
+    root.innerHTML = '';
+    const top = el('div', { class: 'cl-top' });
+    if (o.back) top.append(el('a', { href: '#', class: 'b', style: 'text-decoration:none;font-weight:600' }, '← All demos'));
+    top.append(el('div', {}, [el('h1', {}, o.title), el('div', { class: 'sub' }, o.subtitle || '')]));
+    top.append(el('div', { class: 'spacer' }));
+    if (o.tag) top.append(el('span', { class: 'tag', style: `color:var(${o.color || '--sys'})` }, o.tag));
+    if (o.audience) top.append(el('span', { class: 'tag', style: 'color:var(--muted)' }, o.audience));
+    const pauseB = el('button', { class: 'b' }, 'Pause');
+    const resetB = el('button', { class: 'b warn' }, 'Reset');
+    const themeB = el('button', { class: 'b', title: 'Light/dark (use light on bright projectors)' }, '◐');
+    themeB.onclick = () => setTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+    top.append(pauseB, resetB, themeB);
+    const app = el('div', { class: 'cl-app' });
+    const left = el('div', { class: 'col' }), right = el('div', { class: 'col' });
+    app.append(left, right);
+    root.append(top, app);
+    return { top, left, right, pauseB, resetB };
+  }
+
+  function card(parent, title, cls) {
+    const c = el('div', { class: 'card ' + (cls || '') });
+    if (title) c.append(el('h3', {}, title));
+    parent.append(c); return c;
+  }
+
+  function slider(parent, o) {
+    const fmt = o.fmt || (v => (+v).toFixed(o.dec ?? 0));
+    const val = el('b', {}, fmt(o.value) + (o.unit ? ' ' + o.unit : ''));
+    const inp = el('input', { type: 'range', min: o.min, max: o.max, step: o.step || 1, value: o.value });
+    if (o.color) inp.style.accentColor = `var(${o.color})`;
+    const row = el('div', { class: 'ctl-row' }, [el('label', {}, [el('span', {}, o.label), val]), inp]);
+    if (o.hint) row.append(el('div', { class: 'muted', style: 'font-size:.78rem' }, o.hint));
+    parent.append(row);
+    const upd = () => { val.textContent = fmt(inp.value) + (o.unit ? ' ' + o.unit : ''); o.onInput && o.onInput(+inp.value); };
+    inp.addEventListener('input', upd);
+    return { get: () => +inp.value, set: v => { inp.value = v; upd(); }, el: row, input: inp };
+  }
+
+  function seg(parent, o) {
+    const wrap = el('div', {});
+    if (o.label) wrap.append(el('div', { style: 'font-size:.9rem' }, o.label));
+    const s = el('div', { class: 'seg' }); wrap.append(s);
+    let cur = o.value; const bs = {};
+    o.options.forEach(([v, lab]) => {
+      const b = el('button', {}, lab); bs[v] = b;
+      b.onclick = () => { set(v); };
+      s.append(b);
+    });
+    function set(v, silent) { cur = v; Object.entries(bs).forEach(([k, b]) => b.classList.toggle('on', k == v)); if (!silent) o.onChange && o.onChange(v); }
+    set(cur, true); parent.append(wrap);
+    return { get: () => cur, set };
+  }
+
+  function check(parent, label, value, onChange) {
+    const i = el('input', { type: 'checkbox' }); i.checked = !!value;
+    i.onchange = () => onChange && onChange(i.checked);
+    const l = el('label', { class: 'chk' }, [i, label]); parent.append(l);
+    return { get: () => i.checked, set: v => { i.checked = v; onChange && onChange(v); } };
+  }
+
+  function button(parent, label, onClick, cls) {
+    const b = el('button', { class: 'b ' + (cls || '') }, label); b.onclick = onClick; parent.append(b); return b;
+  }
+
+  function tiles(parent, defs) {
+    const t = el('div', { class: 'tiles' }); const out = {};
+    defs.forEach(([key, label, color]) => {
+      const v = el('div', { class: 'v', style: color ? `color:var(${color})` : '' }, '–');
+      t.append(el('div', { class: 'tile' }, [el('div', { class: 'k' }, label), v])); out[key] = v;
+    });
+    parent.append(t);
+    return { set: (k, s) => { out[k].textContent = s; }, color: (k, c) => { out[k].style.color = `var(${c})`; } };
+  }
+
+  function guide(parent, steps, onStep) {
+    const c = card(parent, 'Guided experiment', 'guide');
+    const n = el('div', { class: 'n' }), h = el('div', { style: 'font-weight:700;margin:2px 0 4px' }), t = el('div', { class: 'step' });
+    const nav = el('div', { class: 'nav' });
+    let i = 0;
+    const prev = button(nav, '‹ Back', () => go(i - 1));
+    const doB = button(nav, 'Set it up for me', () => steps[i].setup && steps[i].setup(), 'pri');
+    const next = button(nav, 'Next ›', () => go(i + 1));
+    c.append(n, h, t, nav);
+    function go(k) {
+      i = clamp(k, 0, steps.length - 1);
+      n.textContent = `Step ${i + 1} of ${steps.length}`; h.textContent = steps[i].title; t.innerHTML = steps[i].text;
+      doB.style.display = steps[i].setup ? '' : 'none';
+      prev.disabled = i === 0; next.disabled = i === steps.length - 1;
+      onStep && onStep(i);
+    }
+    go(0); return { go };
+  }
+
+  /* Canvas sized to its box, with devicePixelRatio */
+  function canvasIn(container) {
+    const cv = el('canvas'); container.append(cv);
+    const ctx = cv.getContext('2d');
+    const st = { cv, ctx, w: 1, h: 1 };
+    const fit = () => {
+      const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+      st.w = Math.max(1, r.width); st.h = Math.max(1, r.height);
+      cv.width = Math.round(st.w * d); cv.height = Math.round(st.h * d); ctx.setTransform(d, 0, 0, d, 0, 0);
+    };
+    fit();
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(cv); else window.addEventListener('resize', fit);
+    st.fit = fit; return st;
+  }
+
+  /* Time-series / XY chart */
+  class Chart {
+    constructor(parent, o) {
+      this.o = Object.assign({ window: 30, height: 150, yMin: null, yMax: null, minSpan: 1, xLabel: 't (s)' }, o);
+      const box = el('div', { class: 'chart', style: `height:${this.o.height}px` }); parent.append(box);
+      this.c = canvasIn(box); this.clear();
+    }
+    clear() { this.t = []; this.d = this.o.series.map(() => []); this.xs = null; this.extra = []; }
+    push(t, vals) {
+      this.t.push(t); vals.forEach((v, i) => this.d[i].push(v));
+      if (this.t.length > 6000) { this.t.splice(0, 2000); this.d.forEach(a => a.splice(0, 2000)); }
+    }
+    setData(xs, ys) { this.t = xs; this.d = ys; }
+    draw(xRange) {
+      const { ctx, w, h } = this.c, o = this.o;
+      ctx.clearRect(0, 0, w, h);
+      const L = 46, R = 10, T = 22, B = 20, pw = w - L - R, ph = h - T - B;
+      const n = this.t.length;
+      let x1 = xRange ? xRange[1] : (n ? this.t[n - 1] : 0), x0 = xRange ? xRange[0] : Math.max(0, x1 - o.window);
+      if (!xRange && x1 < o.window) { x0 = 0; x1 = o.window; }
+      let i0 = 0; while (i0 < n && this.t[i0] < x0) i0++;
+      let lo = Infinity, hi = -Infinity;
+      this.d.forEach((a, si) => { if (o.series[si].noscale) return; for (let i = i0; i < n; i++) { const v = a[i]; if (v == null || !isFinite(v)) continue; if (v < lo) lo = v; if (v > hi) hi = v; } });
+      (this.extra || []).forEach(e => { if (e.y != null) { lo = Math.min(lo, e.y); hi = Math.max(hi, e.y); } });
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      if (o.yMin != null) lo = o.yMin; if (o.yMax != null) hi = o.yMax;
+      if (hi - lo < o.minSpan) { const m = (hi + lo) / 2; lo = m - o.minSpan / 2; hi = m + o.minSpan / 2; }
+      if (o.yMin == null || o.yMax == null) { const p = (hi - lo) * 0.08; if (o.yMin == null) lo -= p; if (o.yMax == null) hi += p; }
+      const X = x => L + (x - x0) / (x1 - x0 || 1) * pw, Y = y => T + (1 - (y - lo) / (hi - lo)) * ph;
+      this.X = X; this.Y = Y;
+      ctx.font = '11px Inter,system-ui,sans-serif'; ctx.fillStyle = css('--muted'); ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1;
+      const step = niceStep((hi - lo) / 4);
+      for (let y = Math.ceil(lo / step) * step; y <= hi + 1e-9; y += step) {
+        ctx.beginPath(); ctx.moveTo(L, Y(y)); ctx.lineTo(L + pw, Y(y)); ctx.stroke();
+        ctx.textAlign = 'right'; ctx.fillText(fmtNum(y, step), L - 5, Y(y) + 4);
+      }
+      const xs = niceStep((x1 - x0) / 6);
+      ctx.textAlign = 'center';
+      for (let x = Math.ceil(x0 / xs) * xs; x <= x1 + 1e-9; x += xs) ctx.fillText(o.xFmt ? o.xFmt(x) : fmtNum(x, xs), X(x), h - 5);
+      if (o.zero && lo < 0 && hi > 0) { ctx.strokeStyle = css('--muted'); ctx.globalAlpha = .5; ctx.beginPath(); ctx.moveTo(L, Y(0)); ctx.lineTo(L + pw, Y(0)); ctx.stroke(); ctx.globalAlpha = 1; }
+      (this.extra || []).forEach(e => { // horizontal reference lines
+        ctx.save(); ctx.strokeStyle = css(e.color); ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(L, Y(e.y)); ctx.lineTo(L + pw, Y(e.y)); ctx.stroke();
+        ctx.fillStyle = css(e.color); ctx.textAlign = 'left'; ctx.fillText(e.label || '', L + 4, Y(e.y) - 4); ctx.restore();
+      });
+      ctx.save(); ctx.beginPath(); ctx.rect(L, T - 2, pw, ph + 4); ctx.clip();
+      o.series.forEach((s, si) => {
+        const a = this.d[si]; ctx.strokeStyle = css(s.color); ctx.lineWidth = s.width || 2; ctx.setLineDash(s.dash || []);
+        ctx.globalAlpha = s.alpha || 1;
+        if (s.bars) {
+          ctx.fillStyle = css(s.color); const bw = pw / Math.max(1, (x1 - x0)) * (s.bars);
+          for (let i = i0; i < n; i++) { const v = a[i]; if (v == null) continue; ctx.fillRect(X(this.t[i]) - bw / 2, Math.min(Y(0), Y(v)), bw, Math.abs(Y(v) - Y(0))); }
+        } else {
+          ctx.beginPath(); let pen = false; const stride = Math.max(1, Math.floor((n - i0) / (pw * 1.5)));
+          for (let i = i0; i < n; i += stride) { const v = a[i]; if (v == null || !isFinite(v)) { pen = false; continue; } const px = X(this.t[i]), py = Y(v); if (!pen) { ctx.moveTo(px, py); pen = true; } else ctx.lineTo(px, py); }
+          if (s.step) { /* ok */ }
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      });
+      ctx.restore(); ctx.setLineDash([]);
+      if (this.vline != null) { ctx.strokeStyle = css('--ink'); ctx.globalAlpha = .5; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(this.vline), T); ctx.lineTo(X(this.vline), T + ph); ctx.stroke(); ctx.globalAlpha = 1; }
+      // title + legend
+      ctx.textAlign = 'left'; ctx.font = '600 12px Inter,system-ui,sans-serif'; ctx.fillStyle = css('--ink');
+      ctx.fillText(o.title || '', L, 14);
+      let lx = L + ctx.measureText(o.title || '').width + 14; ctx.font = '11px Inter,system-ui,sans-serif';
+      o.series.forEach((s, si) => {
+        if (s.nolegend) return;
+        const last = this.d[si][n - 1];
+        const txt = s.name + (last != null && isFinite(last) && !xRange ? ' ' + last.toFixed(s.dec ?? 1) : '');
+        ctx.strokeStyle = css(s.color); ctx.lineWidth = 2.5; ctx.setLineDash(s.dash || []); ctx.beginPath(); ctx.moveTo(lx, 10); ctx.lineTo(lx + 14, 10); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = css('--muted'); ctx.fillText(txt, lx + 18, 14); lx += 26 + ctx.measureText(txt).width;
+      });
+      if (o.yUnit && lx < w - 40) { ctx.fillStyle = css('--muted'); ctx.textAlign = 'right'; ctx.fillText(o.yUnit, w - R, 14); }
+    }
+  }
+  function niceStep(r) { if (!(r > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(r))), f = r / p; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p; }
+  function fmtNum(v, step) { const d = step >= 1 ? 0 : Math.min(3, Math.ceil(-Math.log10(step))); return (Math.abs(v) < 1e-9 ? 0 : v).toFixed(d); }
+
+  /* Animation loop with pause; step(dtReal) */
+  function loop(step, pauseB) {
+    let last = performance.now(), alive = true, paused = false;
+    if (pauseB) pauseB.onclick = () => { paused = !paused; pauseB.textContent = paused ? 'Resume' : 'Pause'; pauseB.classList.toggle('pri', paused); };
+    let nerr = 0;
+    function f(now) { if (!alive) return; requestAnimationFrame(f); const dt = Math.min(0.05, (now - last) / 1000); last = now; try { step(paused ? 0 : dt, paused); } catch (e) { if (nerr++ < 3) console.error(e); } }
+    requestAnimationFrame(f);
+    return { stop: () => { alive = false; }, isPaused: () => paused, setPaused: p => { if (p !== paused) pauseB ? pauseB.onclick() : (paused = p); } };
+  }
+
+  function arrow(ctx, x0, y0, x1, y1, color, w = 3, label) {
+    const a = Math.atan2(y1 - y0, x1 - x0), L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    ctx.save(); ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - Math.cos(a) * 8, y1 - Math.sin(a) * 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - 12 * Math.cos(a - .45), y1 - 12 * Math.sin(a - .45)); ctx.lineTo(x1 - 12 * Math.cos(a + .45), y1 - 12 * Math.sin(a + .45)); ctx.closePath(); ctx.fill();
+    if (label) { ctx.font = '600 12px Inter,system-ui'; ctx.textAlign = 'center'; ctx.fillText(label, (x0 + x1) / 2, (y0 + y1) / 2 - 8); }
+    ctx.restore();
+  }
+  function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function alpha(hex, a) { // css color '#rrggbb' -> rgba
+    hex = hex.replace('#', ''); if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    const n = parseInt(hex, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
+  }
+
+  return { css, clamp, el, randn, shell, card, slider, seg, check, button, tiles, guide, canvasIn, Chart, loop, arrow, rrect, alpha, initTheme, setTheme };
+})();
+</script>
+<script>APPS.energy = {
+  title: 'Smart Home Energy Manager: Rules vs Model Predictive Control', concept: 'Optimisation and predictive control', audience: 'Advanced', color: '--ai',
+  blurb: 'A home with rooftop solar, a battery and an electric car on a time-of-use tariff. A simple rule-based controller competes with MPC, which re-plans every hour using forecasts.',
+  mount(root, back) {
+    const { css, clamp, el } = CL;
+    const S = CL.shell(root, { back, title: this.title, subtitle: 'MPC: at every hour, optimise the next N hours using forecasts → apply only the first decision → measure → repeat', tag: this.concept, audience: this.audience, color: this.color });
+    const HRS = 48, BCAP = 10, BSTEP = 0.5, NB = Math.round(BCAP / BSTEP) + 1, ETA = 0.95, EVSTEP = 2, EVP = [0, 2, 4, 6], PLUG = 18, DEPART = 31, EXP = 3;
+    const price = h => { const hh = h % 24; return hh >= 22 || hh < 6 ? 5 : hh >= 17 ? 11 : 7.5; };
+    const loadP = h => { const hh = h % 24; return 0.55 + 1.3 * Math.exp(-((hh - 8) ** 2) / 3) + 2.4 * Math.exp(-((hh - 20.5) ** 2) / 4) + 0.35 * Math.exp(-((hh - 13) ** 2) / 8) + (h >= 24 ? 0.1 : 0); };
+    const pvClear = h => { const hh = h % 24; return hh <= 6 || hh >= 18 ? 0 : 5 * Math.pow(Math.sin(Math.PI * (hh - 6) / 12), 1.4); };
+    let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+
+    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/6.4' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const tr = el('div', { class: 'card' }); S.left.append(tr);
+    const playRow = el('div', { class: 'btns', style: 'align-items:center' }); tr.append(playRow);
+    let playing = true; const playB = CL.button(playRow, '❚❚ Pause playback', () => { playing = !playing; playB.textContent = playing ? '❚❚ Pause playback' : '▶ Play'; });
+    const hourS = el('input', { type: 'range', min: 0, max: HRS - 1, step: 1, value: 0, style: 'flex:1;min-width:200px' }); playRow.append(hourS);
+    const hourL = el('b', { style: 'min-width:150px' }); playRow.append(hourL);
+    const pl = el('div', { class: 'plots two' }); S.left.append(pl);
+    const xf = x => { const d = Math.floor(x / 24) + 1, hh = Math.round(x % 24); return hh === 0 ? 'Day ' + d : hh + 'h'; };
+    const cA = new CL.Chart(pl, { title: 'Solar & load (kW), price (₹/kWh)', yUnit: '', height: 160, xFmt: xf, minSpan: 4, yMin: 0, series: [{ name: 'Solar (actual)', color: '--warn' }, { name: 'Solar forecast', color: '--warn', dash: [4, 4], alpha: .7 }, { name: 'Load', color: '--sys' }, { name: 'Price', color: '--err', width: 1.5, alpha: .8 }] });
+    const cG = new CL.Chart(pl, { title: 'Grid import (+) / export (−)', yUnit: 'kW', height: 160, xFmt: xf, minSpan: 4, zero: true, series: [{ name: 'Rule-based', color: '--muted' }, { name: 'MPC', color: '--ai' }] });
+    const cB = new CL.Chart(pl, { title: 'Home battery state of charge', yUnit: 'kWh', height: 160, xFmt: xf, yMin: 0, yMax: BCAP, series: [{ name: 'Rule-based', color: '--muted' }, { name: 'MPC', color: '--ai' }, { name: 'MPC plan', color: '--ai', dash: [3, 3], width: 3, alpha: .6 }] });
+    const cE = new CL.Chart(pl, { title: 'Electric car: energy charged', yUnit: 'kWh', height: 160, xFmt: xf, yMin: 0, series: [{ name: 'Rule-based', color: '--muted' }, { name: 'MPC', color: '--ai' }, { name: 'Needed by 7am', color: '--ok', dash: [6, 4] }] });
+    const cC = new CL.Chart(pl, { title: 'Cumulative electricity bill', yUnit: '₹', height: 160, xFmt: xf, minSpan: 50, zero: true, series: [{ name: 'Rule-based', color: '--muted' }, { name: 'MPC', color: '--ai' }] });
+    const cP = new CL.Chart(pl, { title: 'Control actions (MPC)', yUnit: 'kW', height: 160, xFmt: xf, minSpan: 4, zero: true, series: [{ name: 'Battery charge(+)/discharge(−)', color: '--ctl' }, { name: 'Car charging', color: '--ctl', dash: [4, 3] }] });
+    const charts = [cA, cG, cB, cE, cC, cP];
+
+    const tc = CL.card(S.right, 'Score after 48 hours');
+    const Tt = CL.tiles(tc, [['cr', 'Bill: rules', '--muted'], ['cm', 'Bill: MPC', '--ai'], ['sv', 'Saving', '--ok'], ['ov', 'Overload h (R/M)', '--err'], ['pk', 'Peak kW (R/M)', '--sys'], ['ev', 'Car ready? (R/M)', '--ok']]);
+    const mc = CL.card(S.right, 'MPC settings');
+    const N = CL.slider(mc, { label: 'Prediction horizon N', min: 1, max: 24, step: 1, value: 12, unit: 'h', color: '--ai', hint: 'N = 1 is short-sighted. Longer horizons see tonight\'s peak price coming.' });
+    const fe = CL.slider(mc, { label: 'Solar forecast error', min: 0, max: 60, step: 5, value: 15, unit: '%', color: '--err' });
+    const wear = CL.slider(mc, { label: 'Battery wear cost', min: 0, max: 4, step: .25, value: 1, dec: 2, unit: '₹/kWh cycled', color: '--ctl' });
+    const sc = CL.card(S.right, 'Scenario');
+    const evNeed = CL.slider(sc, { label: 'Car needs (plugged in 6 pm, leaves 7 am)', min: 0, max: 40, step: 2, value: 30, unit: 'kWh', color: '--ok' });
+    const glim = CL.slider(sc, { label: 'Grid connection limit', min: 4, max: 12, step: .5, value: 7, dec: 1, unit: 'kW', color: '--err' });
+    const cloud = CL.slider(sc, { label: 'Day 2 cloud cover', min: 0, max: 90, step: 10, value: 60, unit: '%', color: '--err' });
+    const soc0 = CL.slider(sc, { label: 'Battery at start', min: 1, max: 10, step: .5, value: 5, dec: 1, unit: 'kWh', color: '--sys' });
+    [N, fe, wear, evNeed, glim, cloud, soc0].forEach(s => s.input.addEventListener('change', recompute));
+    const ex = CL.card(S.right, 'What you are seeing', 'explain'); const exT = el('div'); ex.append(exT);
+    CL.guide(S.right, [
+      { title: 'The rule-based controller', text: 'Grey lines follow simple rules: charge the car at full power as soon as it is plugged in; charge the battery from surplus solar; discharge it whenever the house needs power. Sensible, but blind to the future.' },
+      { title: 'MPC looks ahead', text: 'Purple lines come from MPC. Scrub to the afternoon of day 1: the dotted purple line is the <b>plan</b> MPC made at that hour. It saves battery energy for the expensive 5–10 pm peak and charges the car after 10 pm, when power is cheap.', setup: () => { setHour(15); } },
+      { title: 'Receding horizon', text: 'Press play and watch the dotted plan: it is recomputed <i>every hour</i> with new measurements. The plan is never executed in full — only its first step. That is what makes MPC a feedback controller.' },
+      { title: 'Constraints are first-class citizens', text: 'Reduce the grid limit to 5 kW. Charging the car at full power on top of the evening load overloads the connection (red hours). MPC spreads the charging out because the limit is part of its optimisation problem.', setup: () => { glim.set(5); recompute(); } },
+      { title: 'Short-sighted vs far-sighted', text: 'Set the horizon to 1 h, then 6 h, then 24 h. Watch the saving grow. With a short horizon MPC cannot “see” the evening peak or the departure deadline.', setup: () => { N.set(1); recompute(); } },
+      { title: 'Bad forecasts', text: 'Increase the forecast error to 60 %. MPC is only as good as its predictions, but because it re-plans every hour it still corrects many mistakes. This is the price and power of model-based control.', setup: () => { N.set(12); fe.set(60); recompute(); } },
+    ]);
+    S.resetB.onclick = () => { N.set(12); fe.set(15); wear.set(1); evNeed.set(30); glim.set(7); cloud.set(60); soc0.set(5); recompute(); setHour(0); };
+
+    let R = null, hour = 0;
+    function profiles() {
+      seed = 11; const pv = [], pvF = [], ld = [];
+      const cl = cloud.get() / 100;
+      for (let h = 0; h < HRS + 24; h++) {
+        const day2 = h >= 24 && h < 48; const c = day2 ? (1 - cl * (0.7 + 0.3 * rnd())) : (0.92 + 0.08 * rnd());
+        pv.push(pvClear(h) * c); ld.push(loadP(h) * (0.9 + 0.2 * rnd()));
+      }
+      const fseeds = []; for (let k = 0; k < HRS; k++) { const row = []; for (let j = 0; j < 24; j++) row.push((rnd() * 2 - 1)); fseeds.push(row); }
+      return { pv, ld, fseeds };
+    }
+    function stageGrid(load, pv, dB, ev) { return load + ev + (dB > 0 ? dB / ETA : dB * ETA) - pv; }
+    function stageCost(h, g, dB) { const lim = glim.get(); let c = g >= 0 ? g * price(h) : g * EXP; if (g > lim) c += (g - lim) * 200; return c + Math.abs(dB) * wear.get(); }
+    function solveDP(k, b0, e0, P) { // returns first action and plan
+      const n = Math.min(N.get(), HRS - k); const need = evNeed.get(), NE = Math.round(need / EVSTEP) + 1;
+      const err = fe.get() / 100;
+      const pvF = j => Math.max(0, P.pv[k + j] * (j === 0 ? 1 : (1 + err * P.fseeds[k][j])));
+      const ldF = j => j === 0 ? P.ld[k] : loadP(k + j);
+      let V = new Float64Array(NB * NE);
+      for (let b = 0; b < NB; b++) for (let e = 0; e < NE; e++) {
+        let c = -b * BSTEP * 6.5; // terminal value of stored energy
+        const hEnd = k + n, rem = need - e * EVSTEP;
+        if (hEnd <= DEPART && hEnd > PLUG) { const left = DEPART - hEnd; if (rem > left * EVP[EVP.length - 1] + 1e-9) c += 1e5; else c += rem * 5; }
+        else if (hEnd > DEPART && rem > 1e-9 && k < DEPART) c += 1e5;
+        V[b * NE + e] = c;
+      }
+      const pol = [];
+      for (let j = n - 1; j >= 0; j--) {
+        const h = k + j, Vn = new Float64Array(NB * NE).fill(Infinity), A = new Int16Array(NB * NE * 2);
+        const plugged = h >= PLUG && h < DEPART, pv = pvF(j), ld = ldF(j);
+        for (let b = 0; b < NB; b++) for (let e = 0; e < NE; e++) {
+          let best = Infinity, ba = 0, bev = 0;
+          for (let db = -6; db <= 6; db++) { const b2 = b + db; if (b2 < 0 || b2 >= NB) continue; const dB = db * BSTEP;
+            for (let a = 0; a < (plugged ? EVP.length : 1); a++) { const e2 = Math.min(NE - 1, e + EVP[a] / EVSTEP); const evE = (e2 - e) * EVSTEP;
+              const g = stageGrid(ld, pv, dB, evE); const c = stageCost(h, g, dB) + V[b2 * NE + e2];
+              if (c < best) { best = c; ba = db; bev = e2 - e; } } }
+          Vn[b * NE + e] = best; A[(b * NE + e) * 2] = ba; A[(b * NE + e) * 2 + 1] = bev;
+        }
+        pol[j] = A; V = Vn;
+      }
+      // roll out plan
+      let b = b0, e = e0; const plan = [b * BSTEP];
+      let first = null;
+      for (let j = 0; j < n; j++) { const i = (b * NE + e) * 2; const db = pol[j][i], de = pol[j][i + 1]; if (j === 0) first = [db, de]; b += db; e += de; plan.push(b * BSTEP); }
+      return { first, plan };
+    }
+    function recompute() {
+      const P = profiles(); const need = evNeed.get(); const NE = Math.round(need / EVSTEP) + 1; const lim = glim.get();
+      const out = { rule: { g: [], b: [], e: [], c: [], ov: 0, pk: 0 }, mpc: { g: [], b: [], e: [], c: [], ov: 0, pk: 0, db: [], ev: [], plans: [] }, P };
+      // rule-based
+      let b = soc0.get(), e = 0, cost = 0;
+      for (let h = 0; h < HRS; h++) {
+        const plugged = h >= PLUG && h < DEPART; const ev = plugged ? Math.min(7.2, need - e) : 0; e += ev;
+        const net = P.ld[h] + ev - P.pv[h]; let dB = 0;
+        if (net < 0) dB = Math.min(-net * ETA, 3.3, BCAP * .95 - b); else dB = -Math.min(net / ETA, 3.3, b - BCAP * .1);
+        dB = Math.max(dB, -b); b += dB;
+        const g = stageGrid(P.ld[h], P.pv[h], dB, ev); cost += (g >= 0 ? g * price(h) : g * EXP) + Math.abs(dB) * wear.get();
+        if (g > lim + 1e-6) out.rule.ov++; out.rule.pk = Math.max(out.rule.pk, g);
+        out.rule.g.push(g); out.rule.b.push(b); out.rule.e.push(e); out.rule.c.push(cost);
+      }
+      out.rule.ready = e >= need - 1e-6;
+      // MPC
+      let bi = Math.round(soc0.get() / BSTEP), ei = 0; cost = 0;
+      for (let h = 0; h < HRS; h++) {
+        const { first, plan } = solveDP(h, bi, ei, P);
+        const dB = first[0] * BSTEP, ev = first[1] * EVSTEP; bi += first[0]; ei = Math.min(NE - 1, ei + first[1]);
+        const g = stageGrid(P.ld[h], P.pv[h], dB, ev); cost += (g >= 0 ? g * price(h) : g * EXP) + Math.abs(dB) * wear.get();
+        if (g > lim + 1e-6) out.mpc.ov++; out.mpc.pk = Math.max(out.mpc.pk, g);
+        out.mpc.g.push(g); out.mpc.b.push(bi * BSTEP); out.mpc.e.push(ei * EVSTEP); out.mpc.c.push(cost); out.mpc.db.push(dB); out.mpc.ev.push(ev); out.mpc.plans.push(plan);
+      }
+      out.mpc.ready = ei * EVSTEP >= need - 1e-6;
+      R = out; render();
+    }
+    function render() {
+      if (!R) return; const xs = [...Array(HRS).keys()].map(i => i + 0.5), xs1 = xs.map(x => x + 0.5);
+      const P = R.P, err = fe.get() / 100;
+      const pvF = xs.map((_, h) => h < hour ? null : Math.max(0, P.pv[h] * (h === hour ? 1 : 1 + err * P.fseeds[hour][Math.min(23, h - hour)])));
+      cA.setData(xs, [P.pv.slice(0, HRS), pvF.map((v, h) => h - hour < N.get() ? v : null), P.ld.slice(0, HRS), xs.map((_, h) => price(h))]);
+      cG.setData(xs, [R.rule.g, R.mpc.g]); cG.extra = [{ y: glim.get(), color: '--err', label: 'grid limit' }];
+      const plan = R.mpc.plans[hour], pl = xs1.map((_, h) => h >= hour && h - hour < plan.length - 1 ? plan[h - hour + 1] : null);
+      cB.setData(xs1, [R.rule.b, R.mpc.b, pl]);
+      cE.setData(xs1, [R.rule.e, R.mpc.e, xs1.map(x => x <= DEPART + .5 && x >= PLUG ? evNeed.get() : null)]);
+      cC.setData(xs1, [R.rule.c, R.mpc.c]); cP.setData(xs, [R.mpc.db, R.mpc.ev]);
+      charts.forEach(c => { c.vline = hour + 0.5; c.draw([0, HRS]); });
+      const cr = R.rule.c[HRS - 1], cm = R.mpc.c[HRS - 1];
+      Tt.set('cr', '₹' + cr.toFixed(0)); Tt.set('cm', '₹' + cm.toFixed(0)); Tt.set('sv', (cr > 0 ? ((cr - cm) / cr * 100).toFixed(0) + ' %' : '₹' + (cr - cm).toFixed(0)));
+      Tt.set('ov', R.rule.ov + ' / ' + R.mpc.ov); Tt.set('pk', R.rule.pk.toFixed(1) + ' / ' + R.mpc.pk.toFixed(1)); Tt.set('ev', (R.rule.ready ? '✓' : '✗') + ' / ' + (R.mpc.ready ? '✓' : '✗'));
+      const d = Math.floor(hour / 24) + 1; hourL.textContent = `Day ${d}, ${String(hour % 24).padStart(2, '0')}:00–${String((hour % 24) + 1).padStart(2, '0')}:00 · ₹${price(hour)}/kWh`;
+      const m = [];
+      const hh = hour % 24;
+      if (hh >= 17 && hh < 22) m.push('Peak price hours. MPC drains the battery it saved earlier; the rule-based battery may already be empty.');
+      if (hour >= PLUG && hour < DEPART) m.push(R.mpc.ev[hour] > 0 ? `MPC is charging the car at ${R.mpc.ev[hour]} kW now${price(hour) <= 5 ? ' — cheap night power' : ''}.` : 'The car is plugged in, but MPC waits: its plan finishes charging later, at lower prices, still before 7 am.');
+      if (R.rule.g[hour] > glim.get()) m.push(`<span style="color:var(--err)">The rule-based home is drawing ${R.rule.g[hour].toFixed(1)} kW, above the ${glim.get()} kW limit.</span>`);
+      if (N.get() < 4) m.push('With such a short horizon, MPC behaves almost like a greedy rule: it cannot anticipate.');
+      m.push(`<span class="muted">Profiles are illustrative (5 kWp solar, 10 kWh battery, 6–7 kW charger, ₹5 / 7.5 / 11 time-of-use tariff, ₹3 export). MPC is solved exactly by dynamic programming on a grid.</span>`);
+      exT.innerHTML = m.map(s => `<p>${s}</p>`).join('');
+    }
+    function setHour(h) { hour = clamp(h, 0, HRS - 1); hourS.value = hour; render(); }
+    hourS.oninput = () => { playing = false; playB.textContent = '▶ Play'; setHour(+hourS.value); };
+    recompute();
+    let acc = 0, ph = 0;
+    const L = CL.loop((rdt, paused) => {
+      if (playing && !paused) { acc += rdt; if (acc > 0.7) { acc = 0; setHour((hour + 1) % HRS); } }
+      ph += rdt; draw();
+    }, S.pauseB);
+
+    function draw() {
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h); if (!R) return;
+      const P = R.P, k = hour, hh = k % 24;
+      const night = hh < 6 || hh >= 19; const sky = ctx.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, night ? 'rgba(20,30,70,.5)' : CL.alpha(css('--sys'), .25)); sky.addColorStop(1, 'transparent'); ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+      const half = w / 2;
+      const panel = (x0, title, g, dB, ev, col) => {
+        ctx.fillStyle = col; ctx.font = '700 15px "Space Grotesk",Inter'; ctx.textAlign = 'center'; ctx.fillText(title, x0 + half / 2, 22);
+        const cx = x0 + half / 2, cy = h * 0.56, s = Math.min(half / 360, h / 230);
+        // house
+        ctx.fillStyle = css('--panel'); ctx.strokeStyle = css('--muted'); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(cx - 55 * s, cy - 10 * s); ctx.lineTo(cx, cy - 55 * s); ctx.lineTo(cx + 55 * s, cy - 10 * s); ctx.lineTo(cx + 45 * s, cy - 10 * s); ctx.lineTo(cx + 45 * s, cy + 45 * s); ctx.lineTo(cx - 45 * s, cy + 45 * s); ctx.lineTo(cx - 45 * s, cy - 10 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = css('--sys'); ctx.font = `600 ${11 * s + 2}px Inter`; ctx.fillText(`home ${P.ld[k].toFixed(1)} kW`, cx, cy + 20 * s);
+        const node = (x, y, lab, val, c) => { ctx.fillStyle = css(c); ctx.beginPath(); ctx.arc(x, y, 20 * s, 0, 7); ctx.globalAlpha = .2; ctx.fill(); ctx.globalAlpha = 1; ctx.font = `600 ${10 * s + 2}px Inter`; ctx.fillText(lab, x, y - 25 * s); ctx.font = `700 ${11 * s + 3}px "Space Grotesk"`; ctx.fillText(val, x, y + 5 * s); };
+        const flow = (x0, y0, x1, y1, p, c) => { if (Math.abs(p) < 0.05) { ctx.strokeStyle = css('--grid'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); return; }
+          const [a, b2, c2, d] = p > 0 ? [x0, y0, x1, y1] : [x1, y1, x0, y0]; ctx.strokeStyle = css(c); ctx.lineWidth = 2 + Math.abs(p) * 1.2; ctx.setLineDash([8, 8]); ctx.lineDashOffset = -ph * 40; ctx.beginPath(); ctx.moveTo(a, b2); ctx.lineTo(c2, d); ctx.stroke(); ctx.setLineDash([]); };
+        const sunX = cx - 120 * s, sunY = cy - 50 * s, gX = cx + 130 * s, gY = cy - 40 * s, bX = cx - 120 * s, bY = cy + 55 * s, eX = cx + 130 * s, eY = cy + 55 * s;
+        flow(sunX, sunY, cx - 45 * s, cy - 5 * s, P.pv[k], '--warn'); node(sunX, sunY, 'solar', P.pv[k].toFixed(1), '--warn');
+        flow(gX, gY, cx + 45 * s, cy - 5 * s, g, g > glim.get() ? '--err' : '--sys'); node(gX, gY, 'grid ₹' + price(k), (g >= 0 ? '+' : '') + g.toFixed(1), g > glim.get() ? '--err' : '--sys');
+        flow(cx - 45 * s, cy + 35 * s, bX, bY, dB, '--ctl'); node(bX, bY, 'battery', (dB >= 0 ? '+' : '') + dB.toFixed(1), '--ctl');
+        flow(cx + 45 * s, cy + 35 * s, eX, eY, ev, '--ctl'); node(eX, eY, k >= PLUG && k < DEPART ? 'car 🔌' : 'car (away)', ev.toFixed(1), '--ctl');
+      };
+      panel(0, 'Rule-based', R.rule.g[k], R.rule.b[k] - (k ? R.rule.b[k - 1] : soc0.get()), k >= PLUG && k < DEPART ? R.rule.e[k] - (k ? R.rule.e[k - 1] : 0) : 0, css('--muted'));
+      panel(half, 'Model Predictive Control', R.mpc.g[k], R.mpc.db[k], R.mpc.ev[k], css('--ai'));
+      ctx.strokeStyle = css('--line'); ctx.beginPath(); ctx.moveTo(half, 30); ctx.lineTo(half, h - 10); ctx.stroke();
+      ctx.font = '600 13px Inter'; ctx.textAlign = 'left'; ctx.fillStyle = css('--muted'); ctx.fillText(`Day ${Math.floor(k / 24) + 1}  ${String(hh).padStart(2, '0')}:00   (kW)`, 10, h - 10);
+    }
+    return { stop: L.stop };
+  }
+};
+
+CL.initTheme(); APPS['energy'].mount(document.getElementById('root'), false);</script>
+<script>/* link back to the main website */
+(function () {
+  var a = document.createElement('a');
+  a.href = '../index.html'; a.textContent = '← Bhabani Shankar Dey';
+  a.style.cssText = 'display:inline-block;margin-bottom:3px;font:600 12px/1.2 Inter,system-ui,sans-serif;letter-spacing:.02em;color:var(--muted);text-decoration:none';
+  var h1 = document.querySelector('.cl-top h1');
+  if (h1) { h1.parentNode.insertBefore(a, h1); a.insertAdjacentHTML('afterend', '<br>'); }
+  else { a.style.cssText += ';position:fixed;left:12px;bottom:12px;z-index:50;padding:6px 10px;border:1px solid var(--line);border-radius:99px;background:var(--panel)'; document.body.appendChild(a); }
+})();
+</script>
+</body></html>

@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Control Lab – cruise</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"><style>:root{
+  --bg:#0b1020;--panel:#121a30;--panel2:#18223d;--ink:#e8edf7;--muted:#9aa7c2;--line:#26324f;--grid:#1d2742;
+  --sys:#4da3ff;--ctl:#ff9f43;--ok:#2ecc71;--err:#ff5d5d;--ai:#b48cff;--warn:#ffd166;
+  --radius:14px;font-size:16px;color-scheme:dark;
+}
+[data-theme=light]{
+  --bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2f8;--ink:#14203a;--muted:#55627f;--line:#d6dcea;--grid:#e6ebf4;
+  --sys:#1c6dd0;--ctl:#e07800;--ok:#14984a;--err:#d63031;--ai:#7a4ed6;--warn:#b7791f;color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
+h1,h2,h3{font-family:"Space Grotesk","Inter",system-ui,sans-serif;letter-spacing:-.01em;margin:0}
+a{color:var(--sys)}
+.cl-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+.cl-top h1{font-size:1.35rem}
+.cl-top .sub{color:var(--muted);font-size:.92rem}
+.cl-top .spacer{flex:1}
+.tag{display:inline-block;font-size:.75rem;font-weight:600;padding:3px 9px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.cl-app{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:14px;padding:14px;max-width:1500px;margin:0 auto}
+@media (max-width:980px){.cl-app{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.card h3{font-size:.95rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;font-weight:600}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.visual{position:relative;width:100%;aspect-ratio:16/7;border-radius:10px;overflow:hidden;background:var(--panel2)}
+.visual canvas{width:100%;height:100%;display:block;touch-action:none}
+.plots{display:grid;grid-template-columns:1fr;gap:10px}
+.plots.two{grid-template-columns:1fr 1fr}
+@media (max-width:700px){.plots.two{grid-template-columns:1fr}}
+.chart{position:relative;width:100%;height:150px}
+.chart canvas{width:100%;height:100%;display:block}
+.ctl-row{margin:8px 0 12px}
+.ctl-row label{display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:3px}
+.ctl-row label b{font-variant-numeric:tabular-nums;font-weight:600}
+input[type=range]{width:100%;accent-color:var(--ctl);height:22px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button.b{font:inherit;font-size:.88rem;font-weight:600;padding:7px 12px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);cursor:pointer}
+button.b:hover{border-color:var(--muted)}
+button.b.pri{background:var(--sys);border-color:var(--sys);color:#fff}
+button.b.warn{border-color:var(--err);color:var(--err)}
+button.b.on{outline:2px solid var(--ctl);outline-offset:1px}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:4px 0 10px}
+.seg button{flex:1;font:inherit;font-size:.85rem;padding:7px 6px;background:var(--panel2);color:var(--muted);border:0;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--sys);color:#fff;font-weight:600}
+.chk{display:flex;align-items:center;gap:8px;font-size:.9rem;margin:6px 0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.tile{background:var(--panel2);border-radius:10px;padding:8px 10px}
+.tile .k{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.tile .v{font-size:1.35rem;font-weight:700;font-variant-numeric:tabular-nums;font-family:"Space Grotesk",system-ui}
+.explain{font-size:.95rem}
+.explain p{margin:.3em 0}
+.guide .step{font-size:.93rem}
+.guide .n{color:var(--muted);font-size:.8rem}
+.guide .nav{display:flex;gap:8px;margin-top:8px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:.8rem;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-2px}
+.badge{font-weight:700;padding:4px 10px;border-radius:8px;font-size:.9rem}
+.kbd{font-family:ui-monospace,monospace;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:.85em}
+.muted{color:var(--muted)}
+.eq{font-family:"Cambria Math","STIX Two Math",Georgia,serif;font-size:1.05rem;background:var(--panel2);padding:6px 10px;border-radius:8px;display:inline-block}
+/* hub */
+.hub{max-width:1200px;margin:0 auto;padding:26px 18px 60px}
+.hub h1{font-size:2.2rem}
+.hub .lead{color:var(--muted);font-size:1.05rem;max-width:760px}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;margin-top:18px}
+.dcard{display:block;text-decoration:none;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--c);border-radius:var(--radius);padding:14px 16px;transition:transform .12s}
+.dcard:hover{transform:translateY(-2px);border-color:var(--c)}
+.dcard h2{font-size:1.15rem;margin:4px 0 6px}
+.dcard p{margin:0;color:var(--muted);font-size:.92rem}
+.dcard .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.sect{margin-top:30px;font-size:.85rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.colorkey{display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;font-size:.9rem}
+.colorkey span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--c);margin-right:6px;vertical-align:-1px}
+.overlay-msg{position:absolute;inset:auto 0 12px 0;text-align:center;pointer-events:none}
+.overlay-msg span{background:rgba(0,0,0,.6);color:#fff;padding:6px 14px;border-radius:99px;font-weight:600}
+</style></head>
+<body><div id="root"></div>
+<script>/* Control Lab — shared helpers (no external libraries) */
+window.APPS = window.APPS || {};
+const CL = (() => {
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const el = (tag, attrs = {}, kids = []) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (k === 'class') e.className = v;
+      else if (k === 'html') e.innerHTML = v;
+      else if (k === 'style') e.style.cssText = v;
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+      else e.setAttribute(k, v);
+    }
+    (Array.isArray(kids) ? kids : [kids]).forEach(c => c != null && e.append(c.nodeType ? c : document.createTextNode(c)));
+    return e;
+  };
+  let gaussSpare = null;
+  const randn = () => {
+    if (gaussSpare !== null) { const s = gaussSpare; gaussSpare = null; return s; }
+    let u = 0, v = 0; while (u === 0) u = Math.random(); v = Math.random();
+    const r = Math.sqrt(-2 * Math.log(u)); gaussSpare = r * Math.sin(2 * Math.PI * v); return r * Math.cos(2 * Math.PI * v);
+  };
+
+  function setTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    try { localStorage.setItem('cl-theme', t); } catch (e) {}
+  }
+  function initTheme() {
+    let t = 'dark'; try { t = localStorage.getItem('cl-theme') || 'dark'; } catch (e) {}
+    setTheme(t);
+  }
+
+  /* Page shell for one dashboard */
+  function shell(root, o) {
+    root.innerHTML = '';
+    const top = el('div', { class: 'cl-top' });
+    if (o.back) top.append(el('a', { href: '#', class: 'b', style: 'text-decoration:none;font-weight:600' }, '← All demos'));
+    top.append(el('div', {}, [el('h1', {}, o.title), el('div', { class: 'sub' }, o.subtitle || '')]));
+    top.append(el('div', { class: 'spacer' }));
+    if (o.tag) top.append(el('span', { class: 'tag', style: `color:var(${o.color || '--sys'})` }, o.tag));
+    if (o.audience) top.append(el('span', { class: 'tag', style: 'color:var(--muted)' }, o.audience));
+    const pauseB = el('button', { class: 'b' }, 'Pause');
+    const resetB = el('button', { class: 'b warn' }, 'Reset');
+    const themeB = el('button', { class: 'b', title: 'Light/dark (use light on bright projectors)' }, '◐');
+    themeB.onclick = () => setTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+    top.append(pauseB, resetB, themeB);
+    const app = el('div', { class: 'cl-app' });
+    const left = el('div', { class: 'col' }), right = el('div', { class: 'col' });
+    app.append(left, right);
+    root.append(top, app);
+    return { top, left, right, pauseB, resetB };
+  }
+
+  function card(parent, title, cls) {
+    const c = el('div', { class: 'card ' + (cls || '') });
+    if (title) c.append(el('h3', {}, title));
+    parent.append(c); return c;
+  }
+
+  function slider(parent, o) {
+    const fmt = o.fmt || (v => (+v).toFixed(o.dec ?? 0));
+    const val = el('b', {}, fmt(o.value) + (o.unit ? ' ' + o.unit : ''));
+    const inp = el('input', { type: 'range', min: o.min, max: o.max, step: o.step || 1, value: o.value });
+    if (o.color) inp.style.accentColor = `var(${o.color})`;
+    const row = el('div', { class: 'ctl-row' }, [el('label', {}, [el('span', {}, o.label), val]), inp]);
+    if (o.hint) row.append(el('div', { class: 'muted', style: 'font-size:.78rem' }, o.hint));
+    parent.append(row);
+    const upd = () => { val.textContent = fmt(inp.value) + (o.unit ? ' ' + o.unit : ''); o.onInput && o.onInput(+inp.value); };
+    inp.addEventListener('input', upd);
+    return { get: () => +inp.value, set: v => { inp.value = v; upd(); }, el: row, input: inp };
+  }
+
+  function seg(parent, o) {
+    const wrap = el('div', {});
+    if (o.label) wrap.append(el('div', { style: 'font-size:.9rem' }, o.label));
+    const s = el('div', { class: 'seg' }); wrap.append(s);
+    let cur = o.value; const bs = {};
+    o.options.forEach(([v, lab]) => {
+      const b = el('button', {}, lab); bs[v] = b;
+      b.onclick = () => { set(v); };
+      s.append(b);
+    });
+    function set(v, silent) { cur = v; Object.entries(bs).forEach(([k, b]) => b.classList.toggle('on', k == v)); if (!silent) o.onChange && o.onChange(v); }
+    set(cur, true); parent.append(wrap);
+    return { get: () => cur, set };
+  }
+
+  function check(parent, label, value, onChange) {
+    const i = el('input', { type: 'checkbox' }); i.checked = !!value;
+    i.onchange = () => onChange && onChange(i.checked);
+    const l = el('label', { class: 'chk' }, [i, label]); parent.append(l);
+    return { get: () => i.checked, set: v => { i.checked = v; onChange && onChange(v); } };
+  }
+
+  function button(parent, label, onClick, cls) {
+    const b = el('button', { class: 'b ' + (cls || '') }, label); b.onclick = onClick; parent.append(b); return b;
+  }
+
+  function tiles(parent, defs) {
+    const t = el('div', { class: 'tiles' }); const out = {};
+    defs.forEach(([key, label, color]) => {
+      const v = el('div', { class: 'v', style: color ? `color:var(${color})` : '' }, '–');
+      t.append(el('div', { class: 'tile' }, [el('div', { class: 'k' }, label), v])); out[key] = v;
+    });
+    parent.append(t);
+    return { set: (k, s) => { out[k].textContent = s; }, color: (k, c) => { out[k].style.color = `var(${c})`; } };
+  }
+
+  function guide(parent, steps, onStep) {
+    const c = card(parent, 'Guided experiment', 'guide');
+    const n = el('div', { class: 'n' }), h = el('div', { style: 'font-weight:700;margin:2px 0 4px' }), t = el('div', { class: 'step' });
+    const nav = el('div', { class: 'nav' });
+    let i = 0;
+    const prev = button(nav, '‹ Back', () => go(i - 1));
+    const doB = button(nav, 'Set it up for me', () => steps[i].setup && steps[i].setup(), 'pri');
+    const next = button(nav, 'Next ›', () => go(i + 1));
+    c.append(n, h, t, nav);
+    function go(k) {
+      i = clamp(k, 0, steps.length - 1);
+      n.textContent = `Step ${i + 1} of ${steps.length}`; h.textContent = steps[i].title; t.innerHTML = steps[i].text;
+      doB.style.display = steps[i].setup ? '' : 'none';
+      prev.disabled = i === 0; next.disabled = i === steps.length - 1;
+      onStep && onStep(i);
+    }
+    go(0); return { go };
+  }
+
+  /* Canvas sized to its box, with devicePixelRatio */
+  function canvasIn(container) {
+    const cv = el('canvas'); container.append(cv);
+    const ctx = cv.getContext('2d');
+    const st = { cv, ctx, w: 1, h: 1 };
+    const fit = () => {
+      const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+      st.w = Math.max(1, r.width); st.h = Math.max(1, r.height);
+      cv.width = Math.round(st.w * d); cv.height = Math.round(st.h * d); ctx.setTransform(d, 0, 0, d, 0, 0);
+    };
+    fit();
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(cv); else window.addEventListener('resize', fit);
+    st.fit = fit; return st;
+  }
+
+  /* Time-series / XY chart */
+  class Chart {
+    constructor(parent, o) {
+      this.o = Object.assign({ window: 30, height: 150, yMin: null, yMax: null, minSpan: 1, xLabel: 't (s)' }, o);
+      const box = el('div', { class: 'chart', style: `height:${this.o.height}px` }); parent.append(box);
+      this.c = canvasIn(box); this.clear();
+    }
+    clear() { this.t = []; this.d = this.o.series.map(() => []); this.xs = null; this.extra = []; }
+    push(t, vals) {
+      this.t.push(t); vals.forEach((v, i) => this.d[i].push(v));
+      if (this.t.length > 6000) { this.t.splice(0, 2000); this.d.forEach(a => a.splice(0, 2000)); }
+    }
+    setData(xs, ys) { this.t = xs; this.d = ys; }
+    draw(xRange) {
+      const { ctx, w, h } = this.c, o = this.o;
+      ctx.clearRect(0, 0, w, h);
+      const L = 46, R = 10, T = 22, B = 20, pw = w - L - R, ph = h - T - B;
+      const n = this.t.length;
+      let x1 = xRange ? xRange[1] : (n ? this.t[n - 1] : 0), x0 = xRange ? xRange[0] : Math.max(0, x1 - o.window);
+      if (!xRange && x1 < o.window) { x0 = 0; x1 = o.window; }
+      let i0 = 0; while (i0 < n && this.t[i0] < x0) i0++;
+      let lo = Infinity, hi = -Infinity;
+      this.d.forEach((a, si) => { if (o.series[si].noscale) return; for (let i = i0; i < n; i++) { const v = a[i]; if (v == null || !isFinite(v)) continue; if (v < lo) lo = v; if (v > hi) hi = v; } });
+      (this.extra || []).forEach(e => { if (e.y != null) { lo = Math.min(lo, e.y); hi = Math.max(hi, e.y); } });
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      if (o.yMin != null) lo = o.yMin; if (o.yMax != null) hi = o.yMax;
+      if (hi - lo < o.minSpan) { const m = (hi + lo) / 2; lo = m - o.minSpan / 2; hi = m + o.minSpan / 2; }
+      if (o.yMin == null || o.yMax == null) { const p = (hi - lo) * 0.08; if (o.yMin == null) lo -= p; if (o.yMax == null) hi += p; }
+      const X = x => L + (x - x0) / (x1 - x0 || 1) * pw, Y = y => T + (1 - (y - lo) / (hi - lo)) * ph;
+      this.X = X; this.Y = Y;
+      ctx.font = '11px Inter,system-ui,sans-serif'; ctx.fillStyle = css('--muted'); ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1;
+      const step = niceStep((hi - lo) / 4);
+      for (let y = Math.ceil(lo / step) * step; y <= hi + 1e-9; y += step) {
+        ctx.beginPath(); ctx.moveTo(L, Y(y)); ctx.lineTo(L + pw, Y(y)); ctx.stroke();
+        ctx.textAlign = 'right'; ctx.fillText(fmtNum(y, step), L - 5, Y(y) + 4);
+      }
+      const xs = niceStep((x1 - x0) / 6);
+      ctx.textAlign = 'center';
+      for (let x = Math.ceil(x0 / xs) * xs; x <= x1 + 1e-9; x += xs) ctx.fillText(o.xFmt ? o.xFmt(x) : fmtNum(x, xs), X(x), h - 5);
+      if (o.zero && lo < 0 && hi > 0) { ctx.strokeStyle = css('--muted'); ctx.globalAlpha = .5; ctx.beginPath(); ctx.moveTo(L, Y(0)); ctx.lineTo(L + pw, Y(0)); ctx.stroke(); ctx.globalAlpha = 1; }
+      (this.extra || []).forEach(e => { // horizontal reference lines
+        ctx.save(); ctx.strokeStyle = css(e.color); ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(L, Y(e.y)); ctx.lineTo(L + pw, Y(e.y)); ctx.stroke();
+        ctx.fillStyle = css(e.color); ctx.textAlign = 'left'; ctx.fillText(e.label || '', L + 4, Y(e.y) - 4); ctx.restore();
+      });
+      ctx.save(); ctx.beginPath(); ctx.rect(L, T - 2, pw, ph + 4); ctx.clip();
+      o.series.forEach((s, si) => {
+        const a = this.d[si]; ctx.strokeStyle = css(s.color); ctx.lineWidth = s.width || 2; ctx.setLineDash(s.dash || []);
+        ctx.globalAlpha = s.alpha || 1;
+        if (s.bars) {
+          ctx.fillStyle = css(s.color); const bw = pw / Math.max(1, (x1 - x0)) * (s.bars);
+          for (let i = i0; i < n; i++) { const v = a[i]; if (v == null) continue; ctx.fillRect(X(this.t[i]) - bw / 2, Math.min(Y(0), Y(v)), bw, Math.abs(Y(v) - Y(0))); }
+        } else {
+          ctx.beginPath(); let pen = false; const stride = Math.max(1, Math.floor((n - i0) / (pw * 1.5)));
+          for (let i = i0; i < n; i += stride) { const v = a[i]; if (v == null || !isFinite(v)) { pen = false; continue; } const px = X(this.t[i]), py = Y(v); if (!pen) { ctx.moveTo(px, py); pen = true; } else ctx.lineTo(px, py); }
+          if (s.step) { /* ok */ }
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      });
+      ctx.restore(); ctx.setLineDash([]);
+      if (this.vline != null) { ctx.strokeStyle = css('--ink'); ctx.globalAlpha = .5; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(this.vline), T); ctx.lineTo(X(this.vline), T + ph); ctx.stroke(); ctx.globalAlpha = 1; }
+      // title + legend
+      ctx.textAlign = 'left'; ctx.font = '600 12px Inter,system-ui,sans-serif'; ctx.fillStyle = css('--ink');
+      ctx.fillText(o.title || '', L, 14);
+      let lx = L + ctx.measureText(o.title || '').width + 14; ctx.font = '11px Inter,system-ui,sans-serif';
+      o.series.forEach((s, si) => {
+        if (s.nolegend) return;
+        const last = this.d[si][n - 1];
+        const txt = s.name + (last != null && isFinite(last) && !xRange ? ' ' + last.toFixed(s.dec ?? 1) : '');
+        ctx.strokeStyle = css(s.color); ctx.lineWidth = 2.5; ctx.setLineDash(s.dash || []); ctx.beginPath(); ctx.moveTo(lx, 10); ctx.lineTo(lx + 14, 10); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = css('--muted'); ctx.fillText(txt, lx + 18, 14); lx += 26 + ctx.measureText(txt).width;
+      });
+      if (o.yUnit && lx < w - 40) { ctx.fillStyle = css('--muted'); ctx.textAlign = 'right'; ctx.fillText(o.yUnit, w - R, 14); }
+    }
+  }
+  function niceStep(r) { if (!(r > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(r))), f = r / p; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p; }
+  function fmtNum(v, step) { const d = step >= 1 ? 0 : Math.min(3, Math.ceil(-Math.log10(step))); return (Math.abs(v) < 1e-9 ? 0 : v).toFixed(d); }
+
+  /* Animation loop with pause; step(dtReal) */
+  function loop(step, pauseB) {
+    let last = performance.now(), alive = true, paused = false;
+    if (pauseB) pauseB.onclick = () => { paused = !paused; pauseB.textContent = paused ? 'Resume' : 'Pause'; pauseB.classList.toggle('pri', paused); };
+    let nerr = 0;
+    function f(now) { if (!alive) return; requestAnimationFrame(f); const dt = Math.min(0.05, (now - last) / 1000); last = now; try { step(paused ? 0 : dt, paused); } catch (e) { if (nerr++ < 3) console.error(e); } }
+    requestAnimationFrame(f);
+    return { stop: () => { alive = false; }, isPaused: () => paused, setPaused: p => { if (p !== paused) pauseB ? pauseB.onclick() : (paused = p); } };
+  }
+
+  function arrow(ctx, x0, y0, x1, y1, color, w = 3, label) {
+    const a = Math.atan2(y1 - y0, x1 - x0), L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    ctx.save(); ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - Math.cos(a) * 8, y1 - Math.sin(a) * 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - 12 * Math.cos(a - .45), y1 - 12 * Math.sin(a - .45)); ctx.lineTo(x1 - 12 * Math.cos(a + .45), y1 - 12 * Math.sin(a + .45)); ctx.closePath(); ctx.fill();
+    if (label) { ctx.font = '600 12px Inter,system-ui'; ctx.textAlign = 'center'; ctx.fillText(label, (x0 + x1) / 2, (y0 + y1) / 2 - 8); }
+    ctx.restore();
+  }
+  function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function alpha(hex, a) { // css color '#rrggbb' -> rgba
+    hex = hex.replace('#', ''); if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    const n = parseInt(hex, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
+  }
+
+  return { css, clamp, el, randn, shell, card, slider, seg, check, button, tiles, guide, canvasIn, Chart, loop, arrow, rrect, alpha, initTheme, setTheme };
+})();
+</script>
+<script>APPS.cruise = {
+  title: 'Build Your Own Cruise Controller', concept: 'Feedback and tracking', audience: 'Beginners', color: '--sys',
+  blurb: 'Two identical cars, one hill. One driver acts blindly, the other watches the speedometer. Tune the feedback and see why it matters.',
+  mount(root, back) {
+    const { css, clamp, el } = CL;
+    const S = CL.shell(root, { back, title: this.title, subtitle: 'Desired speed → Controller → Engine → Vehicle → Speed sensor → back to Controller', tag: this.concept, audience: this.audience, color: this.color });
+    const P = { m0: 1500, g: 9.81, rho: 1.2, CdA: 0.65, Crr: 0.012, Fmax: 5200, Fbrake: 9000, tau: 0.6 };
+    let st;
+    const reset = () => {
+      const v0 = vref.get() / 3.6;
+      st = { t: 0, s: 0, gust: 0, cars: [mk(v0), mk(v0)] };
+      charts.forEach(c => c.clear());
+    };
+    const mk = v => ({ v, F: ffForce(v, P.m0, 0), I: 0, s: 0, u: 0, sl: 0 });
+    function resist(v, m, slope) { const th = Math.atan(slope / 100); return 0.5 * P.rho * P.CdA * v * Math.abs(v) + P.Crr * m * P.g * Math.cos(th) * Math.sign(v || 1) + m * P.g * Math.sin(th); }
+    function ffForce(v, m, slope) { return resist(v, m, slope); }
+    const thr2F = u => u >= 0 ? u * P.Fmax : u * P.Fbrake;
+    const F2thr = F => F >= 0 ? F / P.Fmax : F / P.Fbrake;
+
+    // ---------- layout
+    const vis = el('div', { class: 'visual' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots' }); S.left.append(pl);
+    const cSpeed = new CL.Chart(pl, { title: 'Speed', yUnit: 'km/h', window: 40, minSpan: 10, series: [{ name: 'Desired', color: '--ok', dash: [6, 4] }, { name: 'Feedback car', color: '--sys' }, { name: 'Open-loop car', color: '--muted', dash: [3, 3] }] });
+    const cU = new CL.Chart(pl, { title: 'Control input (throttle + / brake −)', yUnit: '%', window: 40, minSpan: 20, zero: true, height: 120, series: [{ name: 'Feedback', color: '--ctl' }, { name: 'Open-loop', color: '--ctl', dash: [3, 3], alpha: .6 }] });
+    const cE = new CL.Chart(pl, { title: 'Tracking error = desired − actual', yUnit: 'km/h', window: 40, minSpan: 4, zero: true, height: 120, series: [{ name: 'Feedback', color: '--err' }, { name: 'Open-loop', color: '--err', dash: [3, 3], alpha: .6 }] });
+    const charts = [cSpeed, cU, cE];
+
+    const tl = CL.card(S.right, 'Live numbers');
+    const T = CL.tiles(tl, [['vf', 'Feedback car', '--sys'], ['vo', 'Open-loop car', '--muted'], ['ef', 'Feedback error', '--err'], ['u', 'Throttle', '--ctl']]);
+
+    const cc = CL.card(S.right, 'Set the scene');
+    const vref = CL.slider(cc, { label: 'Desired speed', min: 30, max: 130, value: 80, unit: 'km/h', color: '--ok' });
+    const slope = CL.slider(cc, { label: 'Road slope', min: -10, max: 10, step: .5, value: 0, unit: '%', dec: 1, color: '--err', hint: '+ uphill, − downhill' });
+    const hills = CL.check(cc, 'Rolling hills (slope changes along the road)', false);
+    const mass = CL.slider(cc, { label: 'Car + load mass', min: 1000, max: 2600, step: 50, value: 1500, unit: 'kg', color: '--err', hint: 'Both drivers assume 1500 kg. Change this to create model uncertainty.' });
+    const bt = el('div', { class: 'btns' }); cc.append(bt);
+    CL.button(bt, '💨 Headwind gust', () => { st.gust = 5; }, 'warn');
+
+    const kc = CL.card(S.right, 'Design the controller');
+    const ff = CL.check(kc, 'Feedforward: start from the driver\'s best guess of throttle', true);
+    const kp = CL.slider(kc, { label: 'Proportional gain Kp', min: 0, max: 20, step: .5, value: 4, dec: 1, unit: '%/(km/h)', color: '--ctl', hint: 'React to the present error' });
+    const ki = CL.slider(kc, { label: 'Integral gain Ki', min: 0, max: 6, step: .1, value: 0, dec: 1, unit: '%/(km/h·s)', color: '--ctl', hint: 'React to accumulated past error' });
+    const lag = CL.check(kc, 'Realistic engine lag (0.6 s)', true);
+
+    const ex = CL.card(S.right, 'What you are seeing', 'explain'); const exT = el('div'); ex.append(exT);
+
+    CL.guide(S.right, [
+      { title: 'Flat road: both cars agree', text: 'On a flat road with the nominal mass, the open-loop driver\'s guess of throttle is exactly right. Both cars hold the desired speed. <b>Open loop works when the world matches your model.</b>', setup: () => { slope.set(0); hills.set(false); mass.set(1500); kp.set(4); ki.set(0); reset(); } },
+      { title: 'A hill appears', text: 'Drag the slope to +6 %. Gravity now pulls back. The open-loop car keeps the same throttle and slows down a lot. The feedback car sees the error and pushes harder.', setup: () => { slope.set(6); } },
+      { title: 'Turn up the gain', text: 'Increase Kp. The error of the feedback car shrinks, but it never reaches zero: a purely proportional controller needs some error to keep pushing.', setup: () => { slope.set(6); kp.set(12); ki.set(0); } },
+      { title: 'Add memory (integral action)', text: 'Raise Ki to about 1.5. The controller accumulates past error and keeps adding throttle until the error is gone. This is the <b>I</b> in PID.', setup: () => { slope.set(6); kp.set(8); ki.set(1.5); } },
+      { title: 'The model is wrong', text: 'Set slope back to 0 and load the car to 2400 kg. The open-loop guess is now wrong even on flat road. Feedback does not need a perfect model: this is <b>robustness</b>.', setup: () => { slope.set(0); mass.set(2400); kp.set(8); ki.set(1.5); } },
+      { title: 'Too greedy?', text: 'Push Kp and Ki to their maximum and hit the gust button. With engine lag, an over-eager controller overshoots and oscillates. Good control balances speed of response with <b>stability</b>.', setup: () => { kp.set(20); ki.set(6); mass.set(1500); hills.set(true); } },
+    ]);
+
+    S.resetB.onclick = reset; reset();
+
+    const dt = 0.01;
+    function slopeAt(s) { return slope.get() + (hills.get() ? 6 * Math.sin(s / 350) + 2.5 * Math.sin(s / 97) : 0); }
+    function step() {
+      const m = mass.get(), vr = vref.get() / 3.6;
+      const g = st.gust > 0 ? 1600 : 0; st.gust = Math.max(0, st.gust - dt);
+      st.cars.forEach((c, k) => {
+        const sl = slopeAt(c.s);
+        const uff = ff.get() || k === 1 ? F2thr(ffForce(vr, P.m0, 0)) : 0;
+        let u;
+        if (k === 1) u = uff; // open loop: fixed guess
+        else {
+          const e = (vr - c.v) * 3.6; // km/h
+          const uI = ki.get() / 100 * c.I;
+          u = uff + kp.get() / 100 * e + uI;
+          const us = clamp(u, -1, 1);
+          if (us === u || Math.sign(e) !== Math.sign(u)) c.I += e * dt; // anti-windup
+          u = us;
+        }
+        c.u = clamp(u, -1, 1);
+        const Ft = thr2F(c.u);
+        c.F += lag.get() ? (Ft - c.F) * dt / P.tau : (Ft - c.F);
+        const a = (c.F - resist(c.v, m, sl) - g) / m;
+        c.v = Math.max(0, c.v + a * dt); c.s += c.v * dt; c.sl = sl;
+      });
+      st.t += dt;
+    }
+    let acc = 0, pushT = 0;
+    const L = CL.loop((rdt, paused) => {
+      if (!paused) { acc += rdt; while (acc >= dt) { step(); acc -= dt; } }
+      if (st.t - pushT >= 0.05) {
+        pushT = st.t; const vr = vref.get(); const [f, o] = st.cars;
+        cSpeed.push(st.t, [vr, f.v * 3.6, o.v * 3.6]); cU.push(st.t, [f.u * 100, o.u * 100]); cE.push(st.t, [vr - f.v * 3.6, vr - o.v * 3.6]);
+      }
+      charts.forEach(c => c.draw()); draw(); explain();
+    }, S.pauseB);
+
+    function drawCar(ctx, x, y, ang, color, ghost, label) {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(-ang); ctx.globalAlpha = ghost ? .55 : 1;
+      ctx.fillStyle = color; CL.rrect(ctx, -46, -30, 92, 22, 7); ctx.fill();
+      CL.rrect(ctx, -26, -46, 50, 20, 8); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.55)'; CL.rrect(ctx, -20, -42, 18, 12, 3); ctx.fill(); CL.rrect(ctx, 2, -42, 17, 12, 3); ctx.fill();
+      ctx.fillStyle = '#111'; [-28, 28].forEach(wx => { ctx.beginPath(); ctx.arc(wx, -8, 9, 0, 7); ctx.fill(); });
+      ctx.fillStyle = '#aaa'; [-28, 28].forEach(wx => { ctx.beginPath(); ctx.arc(wx, -8, 3.5, 0, 7); ctx.fill(); });
+      ctx.globalAlpha = 1; ctx.fillStyle = color; ctx.font = '600 12px Inter,system-ui'; ctx.textAlign = 'center'; ctx.fillText(label, 0, ghost ? -54 : 22);
+      ctx.restore();
+    }
+    function draw() {
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
+      const [f, o] = st.cars;
+      // sky gradient
+      const gr = ctx.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, CL.alpha(css('--sys'), .18)); gr.addColorStop(1, 'transparent'); ctx.fillStyle = gr; ctx.fillRect(0, 0, w, h);
+      const pxm = w / 60; // px per metre
+      const camS = f.s; const cx = w * 0.42;
+      // terrain: integrate height from slope (exaggerated x3 for visibility)
+      const pts = []; const ex = 3;
+      const ref = h * 0.68;
+      let hgt = 0; const s0 = camS - cx / pxm; const N = 120; const ds = (w / pxm) / N;
+      const hAt = []; for (let i = 0; i <= N; i++) { const s = s0 + i * ds; hAt.push(hgt); hgt += slopeAt(s) / 100 * ex * ds; }
+      const hc = hAt[Math.round(cx / pxm / ds)] || 0;
+      for (let i = 0; i <= N; i++) pts.push([i * ds * pxm, ref - (hAt[i] - hc) * pxm]);
+      ctx.beginPath(); ctx.moveTo(0, h); pts.forEach(p => ctx.lineTo(p[0], p[1])); ctx.lineTo(w, h); ctx.closePath();
+      ctx.fillStyle = CL.alpha(css('--muted'), .25); ctx.fill();
+      ctx.strokeStyle = css('--muted'); ctx.lineWidth = 3; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
+      // lane dashes
+      ctx.strokeStyle = css('--ink'); ctx.globalAlpha = .35; ctx.lineWidth = 2; ctx.setLineDash([14, 18]); ctx.lineDashOffset = (camS * pxm) % 32;
+      ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1] + 10) : ctx.moveTo(p[0], p[1] + 10)); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      const yAt = x => { const i = clamp(Math.round(x / pxm / ds), 0, N); return pts[i][1]; };
+      const angAt = x => { const i = clamp(Math.round(x / pxm / ds), 1, N); return Math.atan2(pts[i - 1][1] - pts[i][1], ds * pxm); };
+      // open-loop car position relative
+      let ox = cx + (o.s - f.s) * pxm; const off = ox < 40 || ox > w - 40; ox = clamp(ox, 50, w - 50);
+      drawCar(ctx, ox, yAt(ox) - 16, angAt(ox), css('--muted'), true, 'Open loop' + (off ? (o.s < f.s ? ' (far behind ◄)' : ' (far ahead ►)') : ''));
+      drawCar(ctx, cx, yAt(cx) + 2, angAt(cx), css('--sys'), false, 'Feedback');
+      // forces on feedback car
+      const a = angAt(cx), ux = Math.cos(a), uy = -Math.sin(a), y0 = yAt(cx) - 20;
+      const sc = 0.012; const m = mass.get();
+      const Fg = m * P.g * Math.sin(Math.atan(f.sl / 100)), Fd = 0.5 * P.rho * P.CdA * f.v * f.v;
+      CL.arrow(ctx, cx + 50 * ux, y0 + 50 * uy, cx + (50 + Math.max(0, f.F) * sc) * ux, y0 + (50 + Math.max(0, f.F) * sc) * uy, css('--ctl'), 4, f.F > 50 ? 'engine' : '');
+      if (Fg > 30) CL.arrow(ctx, cx - 50 * ux, y0 - 50 * uy + 10, cx - (50 + Fg * sc) * ux, y0 - (50 + Fg * sc) * uy + 10, css('--err'), 4, 'gravity');
+      CL.arrow(ctx, cx - 50 * ux, y0 - 50 * uy - 14, cx - (50 + Fd * sc) * ux, y0 - (50 + Fd * sc) * uy - 14, CL.alpha(css('--err'), .7), 3, 'drag');
+      if (st.gust > 0) { ctx.fillStyle = css('--err'); ctx.font = '700 15px Inter'; ctx.textAlign = 'left'; ctx.fillText('💨 headwind gust!', w - 190, 30); }
+      // speed readouts
+      ctx.textAlign = 'left'; ctx.font = '700 22px "Space Grotesk",Inter'; ctx.fillStyle = css('--sys'); ctx.fillText((f.v * 3.6).toFixed(1) + ' km/h', 14, 32);
+      ctx.font = '600 14px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText('open loop: ' + (o.v * 3.6).toFixed(1) + ' km/h   •   road ' + f.sl.toFixed(1) + ' %', 14, 54);
+      ctx.fillStyle = css('--ok'); ctx.fillText('target ' + vref.get() + ' km/h', 14, 74);
+    }
+    let lastEx = 0;
+    function explain() {
+      if (performance.now() - lastEx < 400) return; lastEx = performance.now();
+      const [f, o] = st.cars, vr = vref.get(), ef = vr - f.v * 3.6, eo = vr - o.v * 3.6; const m = mass.get();
+      T.set('vf', (f.v * 3.6).toFixed(1)); T.set('vo', (o.v * 3.6).toFixed(1)); T.set('ef', ef.toFixed(1)); T.set('u', (f.u * 100).toFixed(0) + ' %');
+      const msg = [];
+      if (Math.abs(eo) < 1.5 && Math.abs(ef) < 1.5) msg.push('Both cars are on target. Nothing is disturbing the system, so even acting blindly works.');
+      if (Math.abs(eo) >= 1.5) msg.push(`The <b>open-loop</b> car is ${Math.abs(eo).toFixed(0)} km/h ${eo > 0 ? 'too slow' : 'too fast'}: it never looks at its speedometer, so it cannot correct.`);
+      if (Math.abs(ef) >= 1.5 && ki.get() < 0.05 && kp.get() > 0) msg.push(`The <b>feedback</b> car still has ${ef.toFixed(1)} km/h error. A proportional controller only pushes harder <i>because</i> there is an error. Add integral action to remove it.`);
+      else if (Math.abs(ef) < 1.5 && Math.abs(eo) >= 1.5) msg.push('The <b>feedback</b> car measured the error and adjusted the throttle to cancel the disturbance.');
+      if (Math.abs(f.u) > 0.995) msg.push(`<span style="color:var(--err)">The throttle is saturated at ${f.u > 0 ? '100 %' : 'full brake'}. No controller can ask for more than the engine can give.</span>`);
+      if (m !== 1500) msg.push(`The car weighs ${m} kg but both drivers planned for 1500 kg: a <b>model error</b>.`);
+      if (kp.get() === 0 && ki.get() === 0) msg.push('With both gains at zero, the feedback car is really open loop too.');
+      exT.innerHTML = msg.map(s => `<p>${s}</p>`).join('');
+    }
+    return { stop: L.stop };
+  }
+};
+
+CL.initTheme(); APPS['cruise'].mount(document.getElementById('root'), false);</script>
+<script>/* link back to the main website */
+(function () {
+  var a = document.createElement('a');
+  a.href = '../index.html'; a.textContent = '← Bhabani Shankar Dey';
+  a.style.cssText = 'display:inline-block;margin-bottom:3px;font:600 12px/1.2 Inter,system-ui,sans-serif;letter-spacing:.02em;color:var(--muted);text-decoration:none';
+  var h1 = document.querySelector('.cl-top h1');
+  if (h1) { h1.parentNode.insertBefore(a, h1); a.insertAdjacentHTML('afterend', '<br>'); }
+  else { a.style.cssText += ';position:fixed;left:12px;bottom:12px;z-index:50;padding:6px 10px;border:1px solid var(--line);border-radius:99px;background:var(--panel)'; document.body.appendChild(a); }
+})();
+</script>
+</body></html>

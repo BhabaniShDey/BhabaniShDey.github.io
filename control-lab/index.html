@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Control Lab — The Science of Control</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"><style>:root{
+  --bg:#0b1020;--panel:#121a30;--panel2:#18223d;--ink:#e8edf7;--muted:#9aa7c2;--line:#26324f;--grid:#1d2742;
+  --sys:#4da3ff;--ctl:#ff9f43;--ok:#2ecc71;--err:#ff5d5d;--ai:#b48cff;--warn:#ffd166;
+  --radius:14px;font-size:16px;color-scheme:dark;
+}
+[data-theme=light]{
+  --bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2f8;--ink:#14203a;--muted:#55627f;--line:#d6dcea;--grid:#e6ebf4;
+  --sys:#1c6dd0;--ctl:#e07800;--ok:#14984a;--err:#d63031;--ai:#7a4ed6;--warn:#b7791f;color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
+h1,h2,h3{font-family:"Space Grotesk","Inter",system-ui,sans-serif;letter-spacing:-.01em;margin:0}
+a{color:var(--sys)}
+.cl-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+.cl-top h1{font-size:1.35rem}
+.cl-top .sub{color:var(--muted);font-size:.92rem}
+.cl-top .spacer{flex:1}
+.tag{display:inline-block;font-size:.75rem;font-weight:600;padding:3px 9px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.cl-app{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:14px;padding:14px;max-width:1500px;margin:0 auto}
+@media (max-width:980px){.cl-app{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.card h3{font-size:.95rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;font-weight:600}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.visual{position:relative;width:100%;aspect-ratio:16/7;border-radius:10px;overflow:hidden;background:var(--panel2)}
+.visual canvas{width:100%;height:100%;display:block;touch-action:none}
+.plots{display:grid;grid-template-columns:1fr;gap:10px}
+.plots.two{grid-template-columns:1fr 1fr}
+@media (max-width:700px){.plots.two{grid-template-columns:1fr}}
+.chart{position:relative;width:100%;height:150px}
+.chart canvas{width:100%;height:100%;display:block}
+.ctl-row{margin:8px 0 12px}
+.ctl-row label{display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:3px}
+.ctl-row label b{font-variant-numeric:tabular-nums;font-weight:600}
+input[type=range]{width:100%;accent-color:var(--ctl);height:22px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button.b{font:inherit;font-size:.88rem;font-weight:600;padding:7px 12px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);cursor:pointer}
+button.b:hover{border-color:var(--muted)}
+button.b.pri{background:var(--sys);border-color:var(--sys);color:#fff}
+button.b.warn{border-color:var(--err);color:var(--err)}
+button.b.on{outline:2px solid var(--ctl);outline-offset:1px}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:4px 0 10px}
+.seg button{flex:1;font:inherit;font-size:.85rem;padding:7px 6px;background:var(--panel2);color:var(--muted);border:0;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--sys);color:#fff;font-weight:600}
+.chk{display:flex;align-items:center;gap:8px;font-size:.9rem;margin:6px 0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.tile{background:var(--panel2);border-radius:10px;padding:8px 10px}
+.tile .k{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.tile .v{font-size:1.35rem;font-weight:700;font-variant-numeric:tabular-nums;font-family:"Space Grotesk",system-ui}
+.explain{font-size:.95rem}
+.explain p{margin:.3em 0}
+.guide .step{font-size:.93rem}
+.guide .n{color:var(--muted);font-size:.8rem}
+.guide .nav{display:flex;gap:8px;margin-top:8px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:.8rem;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-2px}
+.badge{font-weight:700;padding:4px 10px;border-radius:8px;font-size:.9rem}
+.kbd{font-family:ui-monospace,monospace;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:.85em}
+.muted{color:var(--muted)}
+.eq{font-family:"Cambria Math","STIX Two Math",Georgia,serif;font-size:1.05rem;background:var(--panel2);padding:6px 10px;border-radius:8px;display:inline-block}
+/* hub */
+.hub{max-width:1200px;margin:0 auto;padding:26px 18px 60px}
+.hub h1{font-size:2.2rem}
+.hub .lead{color:var(--muted);font-size:1.05rem;max-width:760px}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;margin-top:18px}
+.dcard{display:block;text-decoration:none;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--c);border-radius:var(--radius);padding:14px 16px;transition:transform .12s}
+.dcard:hover{transform:translateY(-2px);border-color:var(--c)}
+.dcard h2{font-size:1.15rem;margin:4px 0 6px}
+.dcard p{margin:0;color:var(--muted);font-size:.92rem}
+.dcard .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.sect{margin-top:30px;font-size:.85rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.colorkey{display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;font-size:.9rem}
+.colorkey span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--c);margin-right:6px;vertical-align:-1px}
+.overlay-msg{position:absolute;inset:auto 0 12px 0;text-align:center;pointer-events:none}
+.overlay-msg span{background:rgba(0,0,0,.6);color:#fff;padding:6px 14px;border-radius:99px;font-weight:600}
+</style></head>
+<body><div id="root"></div>
+<script>/* Control Lab — shared helpers (no external libraries) */
+window.APPS = window.APPS || {};
+const CL = (() => {
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const el = (tag, attrs = {}, kids = []) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (k === 'class') e.className = v;
+      else if (k === 'html') e.innerHTML = v;
+      else if (k === 'style') e.style.cssText = v;
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+      else e.setAttribute(k, v);
+    }
+    (Array.isArray(kids) ? kids : [kids]).forEach(c => c != null && e.append(c.nodeType ? c : document.createTextNode(c)));
+    return e;
+  };
+  let gaussSpare = null;
+  const randn = () => {
+    if (gaussSpare !== null) { const s = gaussSpare; gaussSpare = null; return s; }
+    let u = 0, v = 0; while (u === 0) u = Math.random(); v = Math.random();
+    const r = Math.sqrt(-2 * Math.log(u)); gaussSpare = r * Math.sin(2 * Math.PI * v); return r * Math.cos(2 * Math.PI * v);
+  };
+
+  function setTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    try { localStorage.setItem('cl-theme', t); } catch (e) {}
+  }
+  function initTheme() {
+    let t = 'dark'; try { t = localStorage.getItem('cl-theme') || 'dark'; } catch (e) {}
+    setTheme(t);
+  }
+
+  /* Page shell for one dashboard */
+  function shell(root, o) {
+    root.innerHTML = '';
+    const top = el('div', { class: 'cl-top' });
+    if (o.back) top.append(el('a', { href: '#', class: 'b', style: 'text-decoration:none;font-weight:600' }, '← All demos'));
+    top.append(el('div', {}, [el('h1', {}, o.title), el('div', { class: 'sub' }, o.subtitle || '')]));
+    top.append(el('div', { class: 'spacer' }));
+    if (o.tag) top.append(el('span', { class: 'tag', style: `color:var(${o.color || '--sys'})` }, o.tag));
+    if (o.audience) top.append(el('span', { class: 'tag', style: 'color:var(--muted)' }, o.audience));
+    const pauseB = el('button', { class: 'b' }, 'Pause');
+    const resetB = el('button', { class: 'b warn' }, 'Reset');
+    const themeB = el('button', { class: 'b', title: 'Light/dark (use light on bright projectors)' }, '◐');
+    themeB.onclick = () => setTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+    top.append(pauseB, resetB, themeB);
+    const app = el('div', { class: 'cl-app' });
+    const left = el('div', { class: 'col' }), right = el('div', { class: 'col' });
+    app.append(left, right);
+    root.append(top, app);
+    return { top, left, right, pauseB, resetB };
+  }
+
+  function card(parent, title, cls) {
+    const c = el('div', { class: 'card ' + (cls || '') });
+    if (title) c.append(el('h3', {}, title));
+    parent.append(c); return c;
+  }
+
+  function slider(parent, o) {
+    const fmt = o.fmt || (v => (+v).toFixed(o.dec ?? 0));
+    const val = el('b', {}, fmt(o.value) + (o.unit ? ' ' + o.unit : ''));
+    const inp = el('input', { type: 'range', min: o.min, max: o.max, step: o.step || 1, value: o.value });
+    if (o.color) inp.style.accentColor = `var(${o.color})`;
+    const row = el('div', { class: 'ctl-row' }, [el('label', {}, [el('span', {}, o.label), val]), inp]);
+    if (o.hint) row.append(el('div', { class: 'muted', style: 'font-size:.78rem' }, o.hint));
+    parent.append(row);
+    const upd = () => { val.textContent = fmt(inp.value) + (o.unit ? ' ' + o.unit : ''); o.onInput && o.onInput(+inp.value); };
+    inp.addEventListener('input', upd);
+    return { get: () => +inp.value, set: v => { inp.value = v; upd(); }, el: row, input: inp };
+  }
+
+  function seg(parent, o) {
+    const wrap = el('div', {});
+    if (o.label) wrap.append(el('div', { style: 'font-size:.9rem' }, o.label));
+    const s = el('div', { class: 'seg' }); wrap.append(s);
+    let cur = o.value; const bs = {};
+    o.options.forEach(([v, lab]) => {
+      const b = el('button', {}, lab); bs[v] = b;
+      b.onclick = () => { set(v); };
+      s.append(b);
+    });
+    function set(v, silent) { cur = v; Object.entries(bs).forEach(([k, b]) => b.classList.toggle('on', k == v)); if (!silent) o.onChange && o.onChange(v); }
+    set(cur, true); parent.append(wrap);
+    return { get: () => cur, set };
+  }
+
+  function check(parent, label, value, onChange) {
+    const i = el('input', { type: 'checkbox' }); i.checked = !!value;
+    i.onchange = () => onChange && onChange(i.checked);
+    const l = el('label', { class: 'chk' }, [i, label]); parent.append(l);
+    return { get: () => i.checked, set: v => { i.checked = v; onChange && onChange(v); } };
+  }
+
+  function button(parent, label, onClick, cls) {
+    const b = el('button', { class: 'b ' + (cls || '') }, label); b.onclick = onClick; parent.append(b); return b;
+  }
+
+  function tiles(parent, defs) {
+    const t = el('div', { class: 'tiles' }); const out = {};
+    defs.forEach(([key, label, color]) => {
+      const v = el('div', { class: 'v', style: color ? `color:var(${color})` : '' }, '–');
+      t.append(el('div', { class: 'tile' }, [el('div', { class: 'k' }, label), v])); out[key] = v;
+    });
+    parent.append(t);
+    return { set: (k, s) => { out[k].textContent = s; }, color: (k, c) => { out[k].style.color = `var(${c})`; } };
+  }
+
+  function guide(parent, steps, onStep) {
+    const c = card(parent, 'Guided experiment', 'guide');
+    const n = el('div', { class: 'n' }), h = el('div', { style: 'font-weight:700;margin:2px 0 4px' }), t = el('div', { class: 'step' });
+    const nav = el('div', { class: 'nav' });
+    let i = 0;
+    const prev = button(nav, '‹ Back', () => go(i - 1));
+    const doB = button(nav, 'Set it up for me', () => steps[i].setup && steps[i].setup(), 'pri');
+    const next = button(nav, 'Next ›', () => go(i + 1));
+    c.append(n, h, t, nav);
+    function go(k) {
+      i = clamp(k, 0, steps.length - 1);
+      n.textContent = `Step ${i + 1} of ${steps.length}`; h.textContent = steps[i].title; t.innerHTML = steps[i].text;
+      doB.style.display = steps[i].setup ? '' : 'none';
+      prev.disabled = i === 0; next.disabled = i === steps.length - 1;
+      onStep && onStep(i);
+    }
+    go(0); return { go };
+  }
+
+  /* Canvas sized to its box, with devicePixelRatio */
+  function canvasIn(container) {
+    const cv = el('canvas'); container.append(cv);
+    const ctx = cv.getContext('2d');
+    const st = { cv, ctx, w: 1, h: 1 };
+    const fit = () => {
+      const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+      st.w = Math.max(1, r.width); st.h = Math.max(1, r.height);
+      cv.width = Math.round(st.w * d); cv.height = Math.round(st.h * d); ctx.setTransform(d, 0, 0, d, 0, 0);
+    };
+    fit();
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(cv); else window.addEventListener('resize', fit);
+    st.fit = fit; return st;
+  }
+
+  /* Time-series / XY chart */
+  class Chart {
+    constructor(parent, o) {
+      this.o = Object.assign({ window: 30, height: 150, yMin: null, yMax: null, minSpan: 1, xLabel: 't (s)' }, o);
+      const box = el('div', { class: 'chart', style: `height:${this.o.height}px` }); parent.append(box);
+      this.c = canvasIn(box); this.clear();
+    }
+    clear() { this.t = []; this.d = this.o.series.map(() => []); this.xs = null; this.extra = []; }
+    push(t, vals) {
+      this.t.push(t); vals.forEach((v, i) => this.d[i].push(v));
+      if (this.t.length > 6000) { this.t.splice(0, 2000); this.d.forEach(a => a.splice(0, 2000)); }
+    }
+    setData(xs, ys) { this.t = xs; this.d = ys; }
+    draw(xRange) {
+      const { ctx, w, h } = this.c, o = this.o;
+      ctx.clearRect(0, 0, w, h);
+      const L = 46, R = 10, T = 22, B = 20, pw = w - L - R, ph = h - T - B;
+      const n = this.t.length;
+      let x1 = xRange ? xRange[1] : (n ? this.t[n - 1] : 0), x0 = xRange ? xRange[0] : Math.max(0, x1 - o.window);
+      if (!xRange && x1 < o.window) { x0 = 0; x1 = o.window; }
+      let i0 = 0; while (i0 < n && this.t[i0] < x0) i0++;
+      let lo = Infinity, hi = -Infinity;
+      this.d.forEach((a, si) => { if (o.series[si].noscale) return; for (let i = i0; i < n; i++) { const v = a[i]; if (v == null || !isFinite(v)) continue; if (v < lo) lo = v; if (v > hi) hi = v; } });
+      (this.extra || []).forEach(e => { if (e.y != null) { lo = Math.min(lo, e.y); hi = Math.max(hi, e.y); } });
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      if (o.yMin != null) lo = o.yMin; if (o.yMax != null) hi = o.yMax;
+      if (hi - lo < o.minSpan) { const m = (hi + lo) / 2; lo = m - o.minSpan / 2; hi = m + o.minSpan / 2; }
+      if (o.yMin == null || o.yMax == null) { const p = (hi - lo) * 0.08; if (o.yMin == null) lo -= p; if (o.yMax == null) hi += p; }
+      const X = x => L + (x - x0) / (x1 - x0 || 1) * pw, Y = y => T + (1 - (y - lo) / (hi - lo)) * ph;
+      this.X = X; this.Y = Y;
+      ctx.font = '11px Inter,system-ui,sans-serif'; ctx.fillStyle = css('--muted'); ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1;
+      const step = niceStep((hi - lo) / 4);
+      for (let y = Math.ceil(lo / step) * step; y <= hi + 1e-9; y += step) {
+        ctx.beginPath(); ctx.moveTo(L, Y(y)); ctx.lineTo(L + pw, Y(y)); ctx.stroke();
+        ctx.textAlign = 'right'; ctx.fillText(fmtNum(y, step), L - 5, Y(y) + 4);
+      }
+      const xs = niceStep((x1 - x0) / 6);
+      ctx.textAlign = 'center';
+      for (let x = Math.ceil(x0 / xs) * xs; x <= x1 + 1e-9; x += xs) ctx.fillText(o.xFmt ? o.xFmt(x) : fmtNum(x, xs), X(x), h - 5);
+      if (o.zero && lo < 0 && hi > 0) { ctx.strokeStyle = css('--muted'); ctx.globalAlpha = .5; ctx.beginPath(); ctx.moveTo(L, Y(0)); ctx.lineTo(L + pw, Y(0)); ctx.stroke(); ctx.globalAlpha = 1; }
+      (this.extra || []).forEach(e => { // horizontal reference lines
+        ctx.save(); ctx.strokeStyle = css(e.color); ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(L, Y(e.y)); ctx.lineTo(L + pw, Y(e.y)); ctx.stroke();
+        ctx.fillStyle = css(e.color); ctx.textAlign = 'left'; ctx.fillText(e.label || '', L + 4, Y(e.y) - 4); ctx.restore();
+      });
+      ctx.save(); ctx.beginPath(); ctx.rect(L, T - 2, pw, ph + 4); ctx.clip();
+      o.series.forEach((s, si) => {
+        const a = this.d[si]; ctx.strokeStyle = css(s.color); ctx.lineWidth = s.width || 2; ctx.setLineDash(s.dash || []);
+        ctx.globalAlpha = s.alpha || 1;
+        if (s.bars) {
+          ctx.fillStyle = css(s.color); const bw = pw / Math.max(1, (x1 - x0)) * (s.bars);
+          for (let i = i0; i < n; i++) { const v = a[i]; if (v == null) continue; ctx.fillRect(X(this.t[i]) - bw / 2, Math.min(Y(0), Y(v)), bw, Math.abs(Y(v) - Y(0))); }
+        } else {
+          ctx.beginPath(); let pen = false; const stride = Math.max(1, Math.floor((n - i0) / (pw * 1.5)));
+          for (let i = i0; i < n; i += stride) { const v = a[i]; if (v == null || !isFinite(v)) { pen = false; continue; } const px = X(this.t[i]), py = Y(v); if (!pen) { ctx.moveTo(px, py); pen = true; } else ctx.lineTo(px, py); }
+          if (s.step) { /* ok */ }
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      });
+      ctx.restore(); ctx.setLineDash([]);
+      if (this.vline != null) { ctx.strokeStyle = css('--ink'); ctx.globalAlpha = .5; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(this.vline), T); ctx.lineTo(X(this.vline), T + ph); ctx.stroke(); ctx.globalAlpha = 1; }
+      // title + legend
+      ctx.textAlign = 'left'; ctx.font = '600 12px Inter,system-ui,sans-serif'; ctx.fillStyle = css('--ink');
+      ctx.fillText(o.title || '', L, 14);
+      let lx = L + ctx.measureText(o.title || '').width + 14; ctx.font = '11px Inter,system-ui,sans-serif';
+      o.series.forEach((s, si) => {
+        if (s.nolegend) return;
+        const last = this.d[si][n - 1];
+        const txt = s.name + (last != null && isFinite(last) && !xRange ? ' ' + last.toFixed(s.dec ?? 1) : '');
+        ctx.strokeStyle = css(s.color); ctx.lineWidth = 2.5; ctx.setLineDash(s.dash || []); ctx.beginPath(); ctx.moveTo(lx, 10); ctx.lineTo(lx + 14, 10); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = css('--muted'); ctx.fillText(txt, lx + 18, 14); lx += 26 + ctx.measureText(txt).width;
+      });
+      if (o.yUnit && lx < w - 40) { ctx.fillStyle = css('--muted'); ctx.textAlign = 'right'; ctx.fillText(o.yUnit, w - R, 14); }
+    }
+  }
+  function niceStep(r) { if (!(r > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(r))), f = r / p; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p; }
+  function fmtNum(v, step) { const d = step >= 1 ? 0 : Math.min(3, Math.ceil(-Math.log10(step))); return (Math.abs(v) < 1e-9 ? 0 : v).toFixed(d); }
+
+  /* Animation loop with pause; step(dtReal) */
+  function loop(step, pauseB) {
+    let last = performance.now(), alive = true, paused = false;
+    if (pauseB) pauseB.onclick = () => { paused = !paused; pauseB.textContent = paused ? 'Resume' : 'Pause'; pauseB.classList.toggle('pri', paused); };
+    let nerr = 0;
+    function f(now) { if (!alive) return; requestAnimationFrame(f); const dt = Math.min(0.05, (now - last) / 1000); last = now; try { step(paused ? 0 : dt, paused); } catch (e) { if (nerr++ < 3) console.error(e); } }
+    requestAnimationFrame(f);
+    return { stop: () => { alive = false; }, isPaused: () => paused, setPaused: p => { if (p !== paused) pauseB ? pauseB.onclick() : (paused = p); } };
+  }
+
+  function arrow(ctx, x0, y0, x1, y1, color, w = 3, label) {
+    const a = Math.atan2(y1 - y0, x1 - x0), L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    ctx.save(); ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - Math.cos(a) * 8, y1 - Math.sin(a) * 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - 12 * Math.cos(a - .45), y1 - 12 * Math.sin(a - .45)); ctx.lineTo(x1 - 12 * Math.cos(a + .45), y1 - 12 * Math.sin(a + .45)); ctx.closePath(); ctx.fill();
+    if (label) { ctx.font = '600 12px Inter,system-ui'; ctx.textAlign = 'center'; ctx.fillText(label, (x0 + x1) / 2, (y0 + y1) / 2 - 8); }
+    ctx.restore();
+  }
+  function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function alpha(hex, a) { // css color '#rrggbb' -> rgba
+    hex = hex.replace('#', ''); if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    const n = parseInt(hex, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
+  }
+
+  return { css, clamp, el, randn, shell, card, slider, seg, check, button, tiles, guide, canvasIn, Chart, loop, arrow, rrect, alpha, initTheme, setTheme };
+})();
+</script>
+<script>APPS.cruise = {
+  title: 'Build Your Own Cruise Controller', concept: 'Feedback and tracking', audience: 'Beginners', color: '--sys',
+  blurb: 'Two identical cars, one hill. One driver acts blindly, the other watches the speedometer. Tune the feedback and see why it matters.',
+  mount(root, back) {
+    const { css, clamp, el } = CL;
+    const S = CL.shell(root, { back, title: this.title, subtitle: 'Desired speed → Controller → Engine → Vehicle → Speed sensor → back to Controller', tag: this.concept, audience: this.audience, color: this.color });
+    const P = { m0: 1500, g: 9.81, rho: 1.2, CdA: 0.65, Crr: 0.012, Fmax: 5200, Fbrake: 9000, tau: 0.6 };
+    let st;
+    const reset = () => {
+      const v0 = vref.get() / 3.6;
+      st = { t: 0, s: 0, gust: 0, cars: [mk(v0), mk(v0)] };
+      charts.forEach(c => c.clear());
+    };
+    const mk = v => ({ v, F: ffForce(v, P.m0, 0), I: 0, s: 0, u: 0, sl: 0 });
+    function resist(v, m, slope) { const th = Math.atan(slope / 100); return 0.5 * P.rho * P.CdA * v * Math.abs(v) + P.Crr * m * P.g * Math.cos(th) * Math.sign(v || 1) + m * P.g * Math.sin(th); }
+    function ffForce(v, m, slope) { return resist(v, m, slope); }
+    const thr2F = u => u >= 0 ? u * P.Fmax : u * P.Fbrake;
+    const F2thr = F => F >= 0 ? F / P.Fmax : F / P.Fbrake;
+
+    // ---------- layout
+    const vis = el('div', { class: 'visual' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots' }); S.left.append(pl);
+    const cSpeed = new CL.Chart(pl, { title: 'Speed', yUnit: 'km/h', window: 40, minSpan: 10, series: [{ name: 'Desired', color: '--ok', dash: [6, 4] }, { name: 'Feedback car', color: '--sys' }, { name: 'Open-loop car', color: '--muted', dash: [3, 3] }] });
+    const cU = new CL.Chart(pl, { title: 'Control input (throttle + / brake −)', yUnit: '%', window: 40, minSpan: 20, zero: true, height: 120, series: [{ name: 'Feedback', color: '--ctl' }, { name: 'Open-loop', color: '--ctl', dash: [3, 3], alpha: .6 }] });
+    const cE = new CL.Chart(pl, { title: 'Tracking error = desired − actual', yUnit: 'km/h', window: 40, minSpan: 4, zero: true, height: 120, series: [{ name: 'Feedback', color: '--err' }, { name: 'Open-loop', color: '--err', dash: [3, 3], alpha: .6 }] });
+    const charts = [cSpeed, cU, cE];
+
+    const tl = CL.card(S.right, 'Live numbers');
+    const T = CL.tiles(tl, [['vf', 'Feedback car', '--sys'], ['vo', 'Open-loop car', '--muted'], ['ef', 'Feedback error', '--err'], ['u', 'Throttle', '--ctl']]);
+
+    const cc = CL.card(S.right, 'Set the scene');
+    const vref = CL.slider(cc, { label: 'Desired speed', min: 30, max: 130, value: 80, unit: 'km/h', color: '--ok' });
+    const slope = CL.slider(cc, { label: 'Road slope', min: -10, max: 10, step: .5, value: 0, unit: '%', dec: 1, color: '--err', hint: '+ uphill, − downhill' });
+    const hills = CL.check(cc, 'Rolling hills (slope changes along the road)', false);
+    const mass = CL.slider(cc, { label: 'Car + load mass', min: 1000, max: 2600, step: 50, value: 1500, unit: 'kg', color: '--err', hint: 'Both drivers assume 1500 kg. Change this to create model uncertainty.' });
+    const bt = el('div', { class: 'btns' }); cc.append(bt);
+    CL.button(bt, '💨 Headwind gust', () => { st.gust = 5; }, 'warn');
+
+    const kc = CL.card(S.right, 'Design the controller');
+    const ff = CL.check(kc, 'Feedforward: start from the driver\'s best guess of throttle', true);
+    const kp = CL.slider(kc, { label: 'Proportional gain Kp', min: 0, max: 20, step: .5, value: 4, dec: 1, unit: '%/(km/h)', color: '--ctl', hint: 'React to the present error' });
+    const ki = CL.slider(kc, { label: 'Integral gain Ki', min: 0, max: 6, step: .1, value: 0, dec: 1, unit: '%/(km/h·s)', color: '--ctl', hint: 'React to accumulated past error' });
+    const lag = CL.check(kc, 'Realistic engine lag (0.6 s)', true);
+
+    const ex = CL.card(S.right, 'What you are seeing', 'explain'); const exT = el('div'); ex.append(exT);
+
+    CL.guide(S.right, [
+      { title: 'Flat road: both cars agree', text: 'On a flat road with the nominal mass, the open-loop driver\'s guess of throttle is exactly right. Both cars hold the desired speed. <b>Open loop works when the world matches your model.</b>', setup: () => { slope.set(0); hills.set(false); mass.set(1500); kp.set(4); ki.set(0); reset(); } },
+      { title: 'A hill appears', text: 'Drag the slope to +6 %. Gravity now pulls back. The open-loop car keeps the same throttle and slows down a lot. The feedback car sees the error and pushes harder.', setup: () => { slope.set(6); } },
+      { title: 'Turn up the gain', text: 'Increase Kp. The error of the feedback car shrinks, but it never reaches zero: a purely proportional controller needs some error to keep pushing.', setup: () => { slope.set(6); kp.set(12); ki.set(0); } },
+      { title: 'Add memory (integral action)', text: 'Raise Ki to about 1.5. The controller accumulates past error and keeps adding throttle until the error is gone. This is the <b>I</b> in PID.', setup: () => { slope.set(6); kp.set(8); ki.set(1.5); } },
+      { title: 'The model is wrong', text: 'Set slope back to 0 and load the car to 2400 kg. The open-loop guess is now wrong even on flat road. Feedback does not need a perfect model: this is <b>robustness</b>.', setup: () => { slope.set(0); mass.set(2400); kp.set(8); ki.set(1.5); } },
+      { title: 'Too greedy?', text: 'Push Kp and Ki to their maximum and hit the gust button. With engine lag, an over-eager controller overshoots and oscillates. Good control balances speed of response with <b>stability</b>.', setup: () => { kp.set(20); ki.set(6); mass.set(1500); hills.set(true); } },
+    ]);
+
+    S.resetB.onclick = reset; reset();
+
+    const dt = 0.01;
+    function slopeAt(s) { return slope.get() + (hills.get() ? 6 * Math.sin(s / 350) + 2.5 * Math.sin(s / 97) : 0); }
+    function step() {
+      const m = mass.get(), vr = vref.get() / 3.6;
+      const g = st.gust > 0 ? 1600 : 0; st.gust = Math.max(0, st.gust - dt);
+      st.cars.forEach((c, k) => {
+        const sl = slopeAt(c.s);
+        const uff = ff.get() || k === 1 ? F2thr(ffForce(vr, P.m0, 0)) : 0;
+        let u;
+        if (k === 1) u = uff; // open loop: fixed guess
+        else {
+          const e = (vr - c.v) * 3.6; // km/h
+          const uI = ki.get() / 100 * c.I;
+          u = uff + kp.get() / 100 * e + uI;
+          const us = clamp(u, -1, 1);
+          if (us === u || Math.sign(e) !== Math.sign(u)) c.I += e * dt; // anti-windup
+          u = us;
+        }
+        c.u = clamp(u, -1, 1);
+        const Ft = thr2F(c.u);
+        c.F += lag.get() ? (Ft - c.F) * dt / P.tau : (Ft - c.F);
+        const a = (c.F - resist(c.v, m, sl) - g) / m;
+        c.v = Math.max(0, c.v + a * dt); c.s += c.v * dt; c.sl = sl;
+      });
+      st.t += dt;
+    }
+    let acc = 0, pushT = 0;
+    const L = CL.loop((rdt, paused) => {
+      if (!paused) { acc += rdt; while (acc >= dt) { step(); acc -= dt; } }
+      if (st.t - pushT >= 0.05) {
+        pushT = st.t; const vr = vref.get(); const [f, o] = st.cars;
+        cSpeed.push(st.t, [vr, f.v * 3.6, o.v * 3.6]); cU.push(st.t, [f.u * 100, o.u * 100]); cE.push(st.t, [vr - f.v * 3.6, vr - o.v * 3.6]);
+      }
+      charts.forEach(c => c.draw()); draw(); explain();
+    }, S.pauseB);
+
+    function drawCar(ctx, x, y, ang, color, ghost, label) {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(-ang); ctx.globalAlpha = ghost ? .55 : 1;
+      ctx.fillStyle = color; CL.rrect(ctx, -46, -30, 92, 22, 7); ctx.fill();
+      CL.rrect(ctx, -26, -46, 50, 20, 8); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.55)'; CL.rrect(ctx, -20, -42, 18, 12, 3); ctx.fill(); CL.rrect(ctx, 2, -42, 17, 12, 3); ctx.fill();
+      ctx.fillStyle = '#111'; [-28, 28].forEach(wx => { ctx.beginPath(); ctx.arc(wx, -8, 9, 0, 7); ctx.fill(); });
+      ctx.fillStyle = '#aaa'; [-28, 28].forEach(wx => { ctx.beginPath(); ctx.arc(wx, -8, 3.5, 0, 7); ctx.fill(); });
+      ctx.globalAlpha = 1; ctx.fillStyle = color; ctx.font = '600 12px Inter,system-ui'; ctx.textAlign = 'center'; ctx.fillText(label, 0, ghost ? -54 : 22);
+      ctx.restore();
+    }
+    function draw() {
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
+      const [f, o] = st.cars;
+      // sky gradient
+      const gr = ctx.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, CL.alpha(css('--sys'), .18)); gr.addColorStop(1, 'transparent'); ctx.fillStyle = gr; ctx.fillRect(0, 0, w, h);
+      const pxm = w / 60; // px per metre
+      const camS = f.s; const cx = w * 0.42;
+      // terrain: integrate height from slope (exaggerated x3 for visibility)
+      const pts = []; const ex = 3;
+      const ref = h * 0.68;
+      let hgt = 0; const s0 = camS - cx / pxm; const N = 120; const ds = (w / pxm) / N;
+      const hAt = []; for (let i = 0; i <= N; i++) { const s = s0 + i * ds; hAt.push(hgt); hgt += slopeAt(s) / 100 * ex * ds; }
+      const hc = hAt[Math.round(cx / pxm / ds)] || 0;
+      for (let i = 0; i <= N; i++) pts.push([i * ds * pxm, ref - (hAt[i] - hc) * pxm]);
+      ctx.beginPath(); ctx.moveTo(0, h); pts.forEach(p => ctx.lineTo(p[0], p[1])); ctx.lineTo(w, h); ctx.closePath();
+      ctx.fillStyle = CL.alpha(css('--muted'), .25); ctx.fill();
+      ctx.strokeStyle = css('--muted'); ctx.lineWidth = 3; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
+      // lane dashes
+      ctx.strokeStyle = css('--ink'); ctx.globalAlpha = .35; ctx.lineWidth = 2; ctx.setLineDash([14, 18]); ctx.lineDashOffset = (camS * pxm) % 32;
+      ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1] + 10) : ctx.moveTo(p[0], p[1] + 10)); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      const yAt = x => { const i = clamp(Math.round(x / pxm / ds), 0, N); return pts[i][1]; };
+      const angAt = x => { const i = clamp(Math.round(x / pxm / ds), 1, N); return Math.atan2(pts[i - 1][1] - pts[i][1], ds * pxm); };
+      // open-loop car position relative
+      let ox = cx + (o.s - f.s) * pxm; const off = ox < 40 || ox > w - 40; ox = clamp(ox, 50, w - 50);
+      drawCar(ctx, ox, yAt(ox) - 16, angAt(ox), css('--muted'), true, 'Open loop' + (off ? (o.s < f.s ? ' (far behind ◄)' : ' (far ahead ►)') : ''));
+      drawCar(ctx, cx, yAt(cx) + 2, angAt(cx), css('--sys'), false, 'Feedback');
+      // forces on feedback car
+      const a = angAt(cx), ux = Math.cos(a), uy = -Math.sin(a), y0 = yAt(cx) - 20;
+      const sc = 0.012; const m = mass.get();
+      const Fg = m * P.g * Math.sin(Math.atan(f.sl / 100)), Fd = 0.5 * P.rho * P.CdA * f.v * f.v;
+      CL.arrow(ctx, cx + 50 * ux, y0 + 50 * uy, cx + (50 + Math.max(0, f.F) * sc) * ux, y0 + (50 + Math.max(0, f.F) * sc) * uy, css('--ctl'), 4, f.F > 50 ? 'engine' : '');
+      if (Fg > 30) CL.arrow(ctx, cx - 50 * ux, y0 - 50 * uy + 10, cx - (50 + Fg * sc) * ux, y0 - (50 + Fg * sc) * uy + 10, css('--err'), 4, 'gravity');
+      CL.arrow(ctx, cx - 50 * ux, y0 - 50 * uy - 14, cx - (50 + Fd * sc) * ux, y0 - (50 + Fd * sc) * uy - 14, CL.alpha(css('--err'), .7), 3, 'drag');
+      if (st.gust > 0) { ctx.fillStyle = css('--err'); ctx.font = '700 15px Inter'; ctx.textAlign = 'left'; ctx.fillText('💨 headwind gust!', w - 190, 30); }
+      // speed readouts
+      ctx.textAlign = 'left'; ctx.font = '700 22px "Space Grotesk",Inter'; ctx.fillStyle = css('--sys'); ctx.fillText((f.v * 3.6).toFixed(1) + ' km/h', 14, 32);
+      ctx.font = '600 14px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText('open loop: ' + (o.v * 3.6).toFixed(1) + ' km/h   •   road ' + f.sl.toFixed(1) + ' %', 14, 54);
+      ctx.fillStyle = css('--ok'); ctx.fillText('target ' + vref.get() + ' km/h', 14, 74);
+    }
+    let lastEx = 0;
+    function explain() {
+      if (performance.now() - lastEx < 400) return; lastEx = performance.now();
+      const [f, o] = st.cars, vr = vref.get(), ef = vr - f.v * 3.6, eo = vr - o.v * 3.6; const m = mass.get();
+      T.set('vf', (f.v * 3.6).toFixed(1)); T.set('vo', (o.v * 3.6).toFixed(1)); T.set('ef', ef.toFixed(1)); T.set('u', (f.u * 100).toFixed(0) + ' %');
+      const msg = [];
+      if (Math.abs(eo) < 1.5 && Math.abs(ef) < 1.5) msg.push('Both cars are on target. Nothing is disturbing the system, so even acting blindly works.');
+      if (Math.abs(eo) >= 1.5) msg.push(`The <b>open-loop</b> car is ${Math.abs(eo).toFixed(0)} km/h ${eo > 0 ? 'too slow' : 'too fast'}: it never looks at its speedometer, so it cannot correct.`);
+      if (Math.abs(ef) >= 1.5 && ki.get() < 0.05 && kp.get() > 0) msg.push(`The <b>feedback</b> car still has ${ef.toFixed(1)} km/h error. A proportional controller only pushes harder <i>because</i> there is an error. Add integral action to remove it.`);
+      else if (Math.abs(ef) < 1.5 && Math.abs(eo) >= 1.5) msg.push('The <b>feedback</b> car measured the error and adjusted the throttle to cancel the disturbance.');
+      if (Math.abs(f.u) > 0.995) msg.push(`<span style="color:var(--err)">The throttle is saturated at ${f.u > 0 ? '100 %' : 'full brake'}. No controller can ask for more than the engine can give.</span>`);
+      if (m !== 1500) msg.push(`The car weighs ${m} kg but both drivers planned for 1500 kg: a <b>model error</b>.`);
+      if (kp.get() === 0 && ki.get() === 0) msg.push('With both gains at zero, the feedback car is really open loop too.');
+      exT.innerHTML = msg.map(s => `<p>${s}</p>`).join('');
+    }
+    return { stop: L.stop };
+  }
+};
+
+APPS.thermo = {
+  title: 'Temperature Control Lab: P, I and D', concept: 'PID control', audience: 'School / UG', color: '--ctl',
+  blurb: 'Heat or cool a water bath with a delayed, noisy sensor. Compare an on–off thermostat with P, PI and PID, and watch the three terms work.',
+  mount(root, back) {
+    const { css, clamp, el, randn } = CL;
+    const S = CL.shell(root, { back, title: this.title, subtitle: 'u(t) = Kp·e(t) + Ki·∫e dt + Kd·de/dt   — present, past and future of the error', tag: this.concept, audience: this.audience, color: this.color });
+    const K = 50, TAU = 60, SPEED = 6; // °C gain at full power, time constant (s), playback speed
+    let st;
+    const reset = () => {
+      st = { t: 0, T: amb.get(), I: 0, buf: [], dF: 0, prevY: amb.get(), u: 0, up: 0, ui: 0, ud: 0, onoff: 0, spT: 0, spV: sp.get(), peak: -1e9, settle: null, iae: 0, energy: 0, start: amb.get() };
+      charts.forEach(c => c.clear());
+    };
+    const vis = el('div', { class: 'visual' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots' }); S.left.append(pl);
+    const cT = new CL.Chart(pl, { title: 'Temperature', yUnit: '°C', window: 300, minSpan: 6, series: [{ name: 'Setpoint', color: '--ok', dash: [6, 4] }, { name: 'Measured', color: '--sys', width: 1.2, alpha: .55 }, { name: 'True', color: '--sys' }] });
+    const cU = new CL.Chart(pl, { title: 'Control effort (heater + / cooler −)', yUnit: '%', window: 300, yMin: -110, yMax: 110, zero: true, height: 140, series: [{ name: 'Total (after limits)', color: '--ctl', width: 2.5 }, { name: 'P', color: '--sys', width: 1.3 }, { name: 'I', color: '--ai', width: 1.3 }, { name: 'D', color: '--ok', width: 1.3 }] });
+    const charts = [cT, cU];
+    const tl = CL.card(S.right, 'Performance since last setpoint change');
+    const T = CL.tiles(tl, [['os', 'Overshoot', '--err'], ['ts', 'Settling time', '--sys'], ['ss', 'Error now', '--err'], ['en', 'Energy used', '--ctl']]);
+
+    const mc = CL.card(S.right, 'Controller');
+    const mode = CL.seg(mc, { options: [['onoff', 'On–Off'], ['pid', 'PID']], value: 'pid' });
+    const kp = CL.slider(mc, { label: 'Kp  (present)', min: 0, max: 80, step: 1, value: 15, unit: '%/°C', color: '--sys' });
+    const ki = CL.slider(mc, { label: 'Ki  (past)', min: 0, max: 5, step: .05, value: 0, dec: 2, unit: '%/(°C·s)', color: '--ai' });
+    const kd = CL.slider(mc, { label: 'Kd  (future)', min: 0, max: 80, step: 1, value: 0, unit: '%·s/°C', color: '--ok' });
+    const hyst = CL.slider(mc, { label: 'On–Off band', min: 0.2, max: 4, step: .1, value: 1, dec: 1, unit: '°C' });
+    const aw = CL.check(mc, 'Anti-windup (stop integrating when the heater is maxed out)', true);
+    const pr = el('div', { class: 'btns' }); mc.append(el('div', { class: 'muted', style: 'font-size:.8rem;margin:2px 0 4px' }, 'Presets'), pr);
+    const preset = (m, p, i, d) => () => { mode.set(m); kp.set(p); ki.set(i); kd.set(d); };
+    CL.button(pr, 'On–Off', preset('onoff', 15, 0, 0)); CL.button(pr, 'P only', preset('pid', 15, 0, 0)); CL.button(pr, 'PI', preset('pid', 15, .47, 0));
+    CL.button(pr, 'PID', preset('pid', 20, .6, 30)); CL.button(pr, 'Too aggressive', preset('pid', 60, 4, 0), 'warn');
+
+    const pc = CL.card(S.right, 'The water bath');
+    const sp = CL.slider(pc, { label: 'Setpoint', min: 10, max: 70, step: 1, value: 50, unit: '°C', color: '--ok', onInput: v => { if (st) { st.spT = st.t; st.spV = v; st.peak = -1e9; st.settle = null; st.iae = 0; st.energy = 0; st.start = st.T; } } });
+    const amb = CL.slider(pc, { label: 'Room (ambient) temperature', min: 5, max: 40, step: 1, value: 25, unit: '°C', color: '--err' });
+    const delay = CL.slider(pc, { label: 'Sensor/transport delay', min: 0, max: 15, step: .5, value: 4, dec: 1, unit: 's', color: '--err' });
+    const noise = CL.slider(pc, { label: 'Sensor noise', min: 0, max: 1.5, step: .05, value: .15, dec: 2, unit: '°C', color: '--err' });
+    const bt = el('div', { class: 'btns' }); pc.append(bt);
+    CL.button(bt, '🧊 Pour in cold water', () => { st.T -= 12; }, 'warn');
+    const win = CL.check(pc, 'Window open (extra heat loss)', false);
+
+    const ex = CL.card(S.right, 'What you are seeing', 'explain'); const exT = el('div'); ex.append(exT);
+    CL.guide(S.right, [
+      { title: 'The thermostat way', text: 'A household thermostat is <b>on–off</b>: full power below the band, off above. Watch the temperature zig-zag. The delay makes it overshoot the band every time.', setup: () => { preset('onoff', 15, 0, 0)(); reset(); } },
+      { title: 'Proportional: push harder when farther away', text: 'Switch to <b>P only</b>. The response is smooth but settles <i>below</i> 50 °C. Heat leaks out all the time, and P only produces power when there is an error, so some error must remain.', setup: () => { preset('pid', 15, 0, 0)(); reset(); } },
+      { title: 'Integral: remember the past', text: 'Choose <b>PI</b>. The purple I-term slowly grows while the error persists, until the error is gone. Look at the effort plot: at steady state the I-term supplies almost all the power.', setup: () => { preset('pid', 15, .47, 0)(); reset(); } },
+      { title: 'Disturbance rejection', text: 'Press <b>Pour in cold water</b> and open the window. Watch the I-term increase to compensate for the new heat loss. The setpoint is recovered without anyone retuning anything.' },
+      { title: 'Derivative: anticipate', text: 'Choose <b>PID</b> and change the setpoint. The green D-term opposes fast changes and acts like a brake as you approach the target. Now raise the sensor noise and see why engineers filter or limit D.', setup: () => { preset('pid', 20, .6, 30)(); } },
+      { title: 'Windup', text: 'Choose PI, untick <b>anti-windup</b>, set the setpoint to 10 °C, wait, then set it to 60 °C. While the cooler or heater is saturated, the integral keeps growing, so the temperature overshoots badly. Tick anti-windup and repeat.', setup: () => { preset('pid', 15, .47, 0)(); aw.set(false); } },
+      { title: 'Too aggressive = unstable', text: 'Choose <b>Too aggressive</b>, then increase the delay. The loop starts to oscillate and never settles. High gain plus delay erodes stability: this is why tuning is a science.', setup: () => { preset('pid', 60, 4, 0)(); delay.set(6); } },
+    ]);
+    S.resetB.onclick = reset; reset();
+
+    const dt = 0.05;
+    function step() {
+      const Ta = amb.get() - (win.get() ? 15 : 0), loss = win.get() ? 1.6 : 1;
+      const yTrue = st.T, y = yTrue + noise.get() * randn();
+      const e = sp.get() - y;
+      let u;
+      if (mode.get() === 'onoff') {
+        if (e > hyst.get() / 2) st.onoff = 1; else if (e < -hyst.get() / 2) st.onoff = sp.get() < Ta ? -1 : 0;
+        if (sp.get() < Ta - 1 && e < -hyst.get() / 2) st.onoff = -1;
+        u = st.onoff; st.up = u; st.ui = 0; st.ud = 0;
+      } else {
+        const dy = (y - st.prevY) / dt; st.prevY = y; st.dF += (-dy - st.dF) * dt / 1.0; // filtered derivative on measurement
+        st.up = kp.get() / 100 * e; st.ud = kd.get() / 100 * st.dF;
+        const Inew = st.I + e * dt; let ui = ki.get() / 100 * Inew;
+        u = st.up + ui + st.ud; const us = clamp(u, -1, 1);
+        if (!aw.get() || us === u || Math.sign(e) !== Math.sign(u)) st.I = Inew;
+        st.ui = ki.get() / 100 * st.I; u = us;
+      }
+      st.u = clamp(u, -1, 1);
+      st.buf.push(st.u); const nd = Math.round(delay.get() / dt); while (st.buf.length > nd + 1) st.buf.shift();
+      const ud = st.buf.length > nd ? st.buf[0] : 0;
+      st.T += dt * (K * ud - loss * (st.T - Ta)) / TAU;
+      st.t += dt; st.y = y;
+      // metrics
+      const dir = Math.sign(st.spV - (st.start ?? st.T)) || 1;
+      st.peak = Math.max(st.peak, dir * (st.T - st.spV));
+      if (Math.abs(st.T - st.spV) > 0.5) st.settle = null; else if (st.settle == null) st.settle = st.t - st.spT;
+      st.iae += Math.abs(e) * dt; st.energy += Math.abs(ud) * 2 * dt / 3600; // 2 kW heater → kWh
+    }
+    let acc = 0, pushT = -1;
+    const L = CL.loop((rdt, paused) => {
+      if (!paused) { acc += rdt * SPEED; while (acc >= dt) { step(); acc -= dt; } }
+      if (st.t - pushT >= 0.25) {
+        pushT = st.t; cT.push(st.t, [sp.get(), st.y ?? st.T, st.T]);
+        cU.push(st.t, mode.get() === 'onoff' ? [st.u * 100, null, null, null] : [st.u * 100, st.up * 100, st.ui * 100, st.ud * 100]);
+      }
+      cT.extra = mode.get() === 'onoff' ? [{ y: sp.get() + hyst.get() / 2, color: '--muted', label: '' }, { y: sp.get() - hyst.get() / 2, color: '--muted', label: 'band' }] : [];
+      charts.forEach(c => c.draw()); draw(); explain();
+    }, S.pauseB);
+
+    let parts = [];
+    function draw() {
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
+      const tx = w * 0.18, tw = Math.min(w * 0.38, 330), ty = h * 0.18, th = h * 0.68;
+      const f = clamp((st.T - 5) / 70, 0, 1);
+      const water = `rgb(${Math.round(59 + 180 * f)},${Math.round(130 - 62 * f)},${Math.round(246 - 178 * f)})`;
+      // tank
+      ctx.lineWidth = 4; ctx.strokeStyle = css('--muted');
+      ctx.fillStyle = water; ctx.globalAlpha = .85; ctx.fillRect(tx, ty + th * .12, tw, th * .88); ctx.globalAlpha = 1;
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx, ty + th); ctx.lineTo(tx + tw, ty + th); ctx.lineTo(tx + tw, ty); ctx.stroke();
+      // heater coil
+      const ud = st.buf.length ? st.buf[0] : 0; const hc = ud >= 0 ? `rgba(255,${160 - 100 * ud},40,${0.25 + 0.75 * ud})` : `rgba(80,170,255,${0.25 - 0.75 * ud})`;
+      ctx.strokeStyle = hc; ctx.lineWidth = 6; ctx.beginPath();
+      for (let i = 0; i <= 40; i++) { const x = tx + 20 + i * (tw - 40) / 40, y = ty + th - 22 + Math.sin(i * 1.2) * 9; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+      ctx.fillStyle = css('--ctl'); ctx.font = '600 13px Inter'; ctx.textAlign = 'center';
+      ctx.fillText(ud > 0.02 ? `heating ${(ud * 100).toFixed(0)} %` : ud < -0.02 ? `cooling ${(-ud * 100).toFixed(0)} %` : 'actuator idle', tx + tw / 2, ty + th + 22);
+      if (st.buf.length > 1 && Math.abs(st.u - ud) > .05) { ctx.fillStyle = css('--muted'); ctx.fillText(`(commanded ${(st.u * 100).toFixed(0)} % — still on its way: delay)`, tx + tw / 2, ty + th + 40); }
+      // steam / ice particles
+      if (Math.random() < f * 0.6) parts.push({ x: tx + Math.random() * tw, y: ty + th * .12, v: 20 + Math.random() * 30, life: 1 });
+      parts = parts.filter(p => (p.life -= 0.015) > 0);
+      parts.forEach(p => { p.y -= p.v * 0.016; ctx.fillStyle = `rgba(220,220,230,${p.life * .5})`; ctx.beginPath(); ctx.arc(p.x + Math.sin(p.y / 9) * 4, p.y, 5 + (1 - p.life) * 9, 0, 7); ctx.fill(); });
+      // sensor
+      ctx.fillStyle = css('--sys'); ctx.fillRect(tx + tw - 26, ty - 10, 8, th * .6);
+      ctx.font = '600 12px Inter'; ctx.textAlign = 'right'; ctx.fillText('sensor', tx + tw - 30, ty + 4);
+      // thermometer gauge
+      const gx = tx + tw + 70, gy = ty, gh = th; ctx.fillStyle = css('--panel'); CL.rrect(ctx, gx - 12, gy, 24, gh, 12); ctx.fill(); ctx.strokeStyle = css('--line'); ctx.lineWidth = 2; ctx.stroke();
+      const Y = v => gy + gh - (clamp(v, 0, 80) / 80) * gh;
+      ctx.fillStyle = water; CL.rrect(ctx, gx - 8, Y(st.T), 16, gy + gh - Y(st.T) - 2, 8); ctx.fill();
+      ctx.strokeStyle = css('--ok'); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(gx - 24, Y(sp.get())); ctx.lineTo(gx + 24, Y(sp.get())); ctx.stroke();
+      ctx.fillStyle = css('--muted'); ctx.textAlign = 'left'; ctx.font = '11px Inter';
+      for (let v = 0; v <= 80; v += 20) ctx.fillText(v + '°', gx + 18, Y(v) + 4);
+      ctx.fillStyle = css('--ok'); ctx.font = '600 12px Inter'; ctx.fillText('target ' + sp.get() + '°', gx + 30, Y(sp.get()) + 4);
+      ctx.textAlign = 'left'; ctx.font = '700 30px "Space Grotesk",Inter'; ctx.fillStyle = css('--ink'); ctx.fillText(st.T.toFixed(1) + ' °C', 16, 40);
+      ctx.font = '13px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText(`room ${amb.get() - (win.get() ? 15 : 0)} °C${win.get() ? ' (window open)' : ''} • time ×${SPEED}`, 16, 62);
+      // block diagram text on right
+      if (w > 760) {
+        const bx = gx + 120; ctx.font = '600 13px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText('Error now', bx, ty + 10);
+        const e = sp.get() - st.T; ctx.font = '700 22px "Space Grotesk"'; ctx.fillStyle = css('--err'); ctx.fillText((e >= 0 ? '+' : '') + e.toFixed(2) + ' °C', bx, ty + 36);
+        const bar = (lab, v, c, yy) => { ctx.fillStyle = css('--muted'); ctx.font = '12px Inter'; ctx.fillText(lab, bx, yy); const bw = 150; ctx.fillStyle = css('--grid'); ctx.fillRect(bx + 30, yy - 10, bw, 12); ctx.fillStyle = css(c); const vv = clamp(v, -1.5, 1.5) / 1.5 * bw / 2; ctx.fillRect(bx + 30 + bw / 2 + Math.min(0, vv), yy - 10, Math.abs(vv), 12); };
+        if (mode.get() === 'pid') { bar('P', st.up, '--sys', ty + 70); bar('I', st.ui, '--ai', ty + 92); bar('D', st.ud, '--ok', ty + 114); bar('Σ', st.u, '--ctl', ty + 140); }
+      }
+    }
+    let lastEx = 0;
+    function explain() {
+      if (performance.now() - lastEx < 400) return; lastEx = performance.now();
+      const e = sp.get() - st.T, el2 = st.t - st.spT;
+      T.set('os', st.peak > 0.05 ? st.peak.toFixed(1) + ' °C' : '0'); T.set('ts', st.settle != null ? st.settle.toFixed(0) + ' s' : '…');
+      T.set('ss', e.toFixed(2) + ' °C'); T.set('en', (st.energy * 1000).toFixed(0) + ' Wh');
+      const m = [];
+      if (mode.get() === 'onoff') m.push('On–off control only knows “too cold” or “too hot”. Because of the delay, the heater keeps going after the target is reached, so the temperature cycles around the band. Cheap and robust, but never precise.');
+      else {
+        const pOnly = ki.get() === 0;
+        if (pOnly && Math.abs(e) > 0.4 && el2 > 120) m.push(`<b>Steady-state error</b> of ${e.toFixed(1)} °C. The P-term gives ${(st.up * 100).toFixed(0)} % power only because the error exists. Remove the error and the power disappears too.`);
+        if (!pOnly && Math.abs(e) < 0.4 && el2 > 60) m.push(`On target. The <span style="color:var(--ai)">I-term</span> now supplies ${(st.ui * 100).toFixed(0)} % power: it has “learned” how much power the heat leak needs.`);
+        if (Math.abs(st.u) > 0.995) m.push('<span style="color:var(--err)">The actuator is saturated. While it stays saturated, the controller has no control authority left.</span>' + (!aw.get() && ki.get() > 0 ? ' The integral keeps winding up, so expect a big overshoot later.' : ''));
+        if (kd.get() > 0 && noise.get() > 0.5) m.push('The D-term amplifies sensor noise; that is why its effort line is jittery. Real controllers filter the derivative.');
+        if (kp.get() > 45 && ki.get() > 2) m.push('Gains this high, with a delay, give persistent oscillation: the controller keeps reacting to old information.');
+      }
+      if (!m.length) m.push('Change the setpoint or press “Pour in cold water” and watch how each term reacts.');
+      exT.innerHTML = m.map(s => `<p>${s}</p>`).join('');
+    }
+    return { stop: L.stop };
+  }
+};
+
+APPS.pendulum = {
+  title: 'Stabilize an Inverted Pendulum', concept: 'Stability and nonlinear control', audience: 'UG / PG', color: '--sys',
+  blurb: 'The classic benchmark behind Segways, rockets and walking robots. Balance it yourself, then let state feedback (LQR) and an energy-based swing-up do it.',
+  mount(root, back) {
+    const { css, clamp, el, randn } = CL;
+    const S = CL.shell(root, { back, title: this.title, subtitle: 'ẋ = f(x, u),  x = [cart position, cart velocity, angle, angular velocity],  u = force on the cart', tag: this.concept, audience: this.audience, color: this.color });
+    const g = 9.81, b = 0.1, Mc = 1.0, mNom = 0.2, LNom = 0.5, TRACK = 2.5;
+    const Pm = [[11.66, 6.297, 14.832, 3.648], [6.297, 5.818, 13.646, 3.497], [14.832, 13.646, 57.319, 10.5], [3.648, 3.497, 10.5, 2.49]]; // LQR Riccati solution (nominal)
+    let st, keys = { l: 0, r: 0 }, hist = [];
+    const reset = (down) => {
+      st = { t: 0, x: 0, xd: 0, th: down ? Math.PI - 0.05 : 0.12, thd: 0, F: 0, status: 'ok', bal: 0, best: st ? st.best : 0, ctrlOn: true, swing: false, Fq: [] };
+      hist = []; charts.forEach(c => c.clear());
+    };
+    const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
+
+    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/7.5' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots two' }); S.left.append(pl);
+    const cTh = new CL.Chart(pl, { title: 'Pole angle from upright', yUnit: 'deg', window: 15, minSpan: 10, zero: true, height: 140, series: [{ name: 'θ', color: '--sys' }] });
+    const cX = new CL.Chart(pl, { title: 'Cart position', yUnit: 'm', window: 15, minSpan: 1, zero: true, height: 140, series: [{ name: 'x', color: '--sys' }, { name: 'target', color: '--ok', dash: [6, 4] }] });
+    const cF = new CL.Chart(pl, { title: 'Control force', yUnit: 'N', window: 15, minSpan: 10, zero: true, height: 140, series: [{ name: 'u', color: '--ctl' }] });
+    const cV = new CL.Chart(pl, { title: 'Lyapunov function V = xᵀPx', yUnit: '', window: 15, minSpan: .5, yMin: 0, height: 140, series: [{ name: 'V', color: '--ai' }] });
+    const charts = [cTh, cX, cF, cV];
+
+    const tl = CL.card(S.right, 'Status');
+    const T = CL.tiles(tl, [['st', 'State', '--ok'], ['bal', 'Balanced for', '--sys'], ['best', 'Best (manual)', '--ctl']]);
+
+    const mc = CL.card(S.right, 'Who is in control?');
+    const mode = CL.seg(mc, { options: [['auto', 'Feedback controller'], ['manual', 'You'], ['off', 'Nobody']], value: 'auto', onChange: v => { if (v === 'manual') { reset(false); st.th = 0.03; } } });
+    const manHint = el('div', { class: 'muted', style: 'font-size:.85rem' }, ['Hold ', el('span', { class: 'kbd' }, '←'), ' / ', el('span', { class: 'kbd' }, '→'), ' or the buttons below to push the cart.']); mc.append(manHint);
+    const mb = el('div', { class: 'btns', style: 'margin-top:6px' }); mc.append(mb);
+    const hold = (b, k) => { const on = e => { e.preventDefault(); keys[k] = 1; }, off = () => { keys[k] = 0; }; b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); };
+    hold(CL.button(mb, '◀ push left', () => { }), 'l'); hold(CL.button(mb, 'push right ▶', () => { }), 'r');
+    const swing = CL.check(mc, 'Energy-based swing-up when the pole is down (nonlinear)', true);
+
+    const kc = CL.card(S.right, 'State-feedback gains'); kc.append(CL.el('div', { class: 'eq', style: 'margin-bottom:6px' }, 'u = Kθ·θ + Kω·ω + Kx·(x − x*) + Kv·v'));
+    const kth = CL.slider(kc, { label: 'Kθ  angle', min: 0, max: 150, step: .5, value: 73.5, dec: 1, color: '--ctl' });
+    const kw = CL.slider(kc, { label: 'Kω  angular velocity', min: 0, max: 30, step: .1, value: 14.8, dec: 1, color: '--ctl' });
+    const kx = CL.slider(kc, { label: 'Kx  cart position', min: 0, max: 30, step: .1, value: 10, dec: 1, color: '--ctl' });
+    const kv = CL.slider(kc, { label: 'Kv  cart velocity', min: 0, max: 30, step: .1, value: 11.8, dec: 1, color: '--ctl' });
+    const pr = el('div', { class: 'btns' }); kc.append(pr);
+    const preset = (a, b2, c, d) => () => { mode.set('auto'); kth.set(a); kw.set(b2); kx.set(c); kv.set(d); };
+    CL.button(pr, 'LQR (optimal)', preset(73.5, 14.8, 10, 11.8), 'pri'); CL.button(pr, 'Angle only', preset(73.5, 14.8, 0, 0)); CL.button(pr, 'Too weak', preset(10, 3, 0, 0), 'warn'); CL.button(pr, 'Over-damped', preset(40, 30, 3, 8));
+
+    const dc = CL.card(S.right, 'Reality check: disturbances and uncertainty');
+    const xt = CL.slider(dc, { label: 'Target cart position x*', min: -1.5, max: 1.5, step: .1, value: 0, dec: 1, unit: 'm', color: '--ok' });
+    const fmax = CL.slider(dc, { label: 'Motor force limit', min: 5, max: 80, step: 1, value: 40, unit: 'N', color: '--err' });
+    const nz = CL.slider(dc, { label: 'Angle sensor noise', min: 0, max: 3, step: .1, value: 0, dec: 1, unit: 'deg', color: '--err' });
+    const dly = CL.slider(dc, { label: 'Control delay', min: 0, max: 120, step: 5, value: 0, unit: 'ms', color: '--err' });
+    const mp = CL.slider(dc, { label: 'Real pole mass (controller assumes 0.2 kg)', min: .05, max: 1.2, step: .05, value: .2, dec: 2, unit: 'kg', color: '--err' });
+    const wind = CL.slider(dc, { label: 'Random push (wind)', min: 0, max: 6, step: .5, value: 0, dec: 1, unit: 'N', color: '--err' });
+    const db = el('div', { class: 'btns' }); dc.append(db);
+    CL.button(db, '👉 Tap the pole', () => { st.thd += (Math.random() < .5 ? -1 : 1) * 1.6; }, 'warn');
+    CL.button(db, 'Start hanging down', () => reset(true));
+    CL.button(db, 'Start upright', () => reset(false));
+
+    const ex = CL.card(S.right, 'What you are seeing', 'explain'); const exT = el('div'); ex.append(exT);
+    CL.guide(S.right, [
+      { title: 'Nobody in control', text: 'Choose <b>Nobody</b>. Upright is an <b>equilibrium</b> (forces balance), but an <b>unstable</b> one: the tiniest tilt grows. Where does the pole end up? Hanging down is the stable equilibrium.', setup: () => { mode.set('off'); reset(false); } },
+      { title: 'You are the controller', text: 'Choose <b>You</b> and keep the pole up with the arrow keys. You will find yourself moving the cart <i>under</i> the falling pole, just as you move your hand under a balanced broomstick.', setup: () => { mode.set('manual'); } },
+      { title: 'Angle feedback only', text: 'Press <b>Angle only</b>. The pole stays up, but the cart drifts and eventually hits the end of the track. Stabilising one variable is not enough: the controller must watch the <b>whole state</b>.', setup: () => { preset(73.5, 14.8, 0, 0)(); reset(false); } },
+      { title: 'Full state feedback (LQR)', text: 'Press <b>LQR</b>. Now the pole stays up <i>and</i> the cart returns to x*. Move the target slider: notice the cart first moves the <i>wrong</i> way to tilt the pole in the direction it wants to travel. V(x) keeps decreasing — that is a Lyapunov certificate.', setup: () => { preset(73.5, 14.8, 10, 11.8)(); reset(false); } },
+      { title: 'Robustness test', text: 'Increase the real pole mass, add noise, a 60 ms delay and wind. Linear LQR tolerates a surprising amount — until it does not. Robust control asks: <i>how much uncertainty can we guarantee to survive?</i>', setup: () => { mp.set(.5); nz.set(1); dly.set(60); wind.set(2); } },
+      { title: 'Nonlinear: swing-up', text: 'Press <b>Start hanging down</b>. A linear controller is useless 180° away from upright. A nonlinear energy-pumping law swings the pole up, then hands over to LQR near the top. This is a hybrid nonlinear controller.', setup: () => { mp.set(.2); nz.set(0); dly.set(0); wind.set(0); preset(73.5, 14.8, 10, 11.8)(); swing.set(true); reset(true); } },
+    ]);
+    S.resetB.onclick = () => reset(false); reset(false);
+    const kd = e => { if (e.key === 'ArrowLeft') { keys.l = 1; e.preventDefault(); } if (e.key === 'ArrowRight') { keys.r = 1; e.preventDefault(); } };
+    const ku = e => { if (e.key === 'ArrowLeft') keys.l = 0; if (e.key === 'ArrowRight') keys.r = 0; };
+    window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
+    cv.cv.addEventListener('pointerdown', e => { const r = cv.cv.getBoundingClientRect(); const px = e.clientX - r.left; st.thd += (px < geo.bx ? -1 : 1) * 1.4; });
+
+    function deriv(s, F, m, L) {
+      const sn = Math.sin(s.th), cs = Math.cos(s.th);
+      const xdd = (F - b * s.xd + m * L * s.thd * s.thd * sn - m * g * sn * cs) / (Mc + m * sn * sn);
+      const thdd = (g * sn - xdd * cs) / L - 0.02 * s.thd;
+      return [s.xd, xdd, s.thd, thdd];
+    }
+    function controller() {
+      const thm = wrap(st.th) + nz.get() * Math.PI / 180 * randn();
+      const m = mNom, L = LNom;
+      if (mode.get() === 'off') return 0;
+      if (mode.get() === 'manual') return (keys.r - keys.l) * 15;
+      const near = Math.abs(thm) < 0.6;
+      if (!near) {
+        st.swing = swing.get();
+        if (!swing.get()) return 0;
+        const E = 0.5 * m * L * L * st.thd * st.thd + m * g * L * (Math.cos(thm) - 1);
+        let a = clamp(30 * E * Math.sign(st.thd * Math.cos(thm) || 1), -7, 7) - 2.0 * (st.x - 0) - 2.5 * st.xd;
+        if (Math.abs(E) < 0.01 && Math.abs(thm) > 2.9 && Math.abs(st.thd) < 0.05) a = 6; // kick if resting at the bottom
+        const sn = Math.sin(thm), cs = Math.cos(thm);
+        return (Mc + m * sn * sn) * a + b * st.xd - m * L * st.thd * st.thd * sn + m * g * sn * cs;
+      }
+      st.swing = false;
+      return kth.get() * thm + kw.get() * st.thd + kx.get() * (st.x - xt.get()) + kv.get() * st.xd;
+    }
+    const dt = 0.002; let wnd = 0;
+    function step() {
+      let F = clamp(controller(), -fmax.get(), fmax.get());
+      st.Fq.push(F); const nd = Math.round(dly.get() / 1000 / dt); while (st.Fq.length > nd + 1) st.Fq.shift(); F = st.Fq[0];
+      st.F = F;
+      wnd += (wind.get() * randn() * 3 - wnd) * dt / 0.3;
+      const m = mp.get(), L = LNom, Ft = F + wnd;
+      const s = st, k1 = deriv(s, Ft, m, L);
+      const s2 = { x: s.x + k1[0] * dt / 2, xd: s.xd + k1[1] * dt / 2, th: s.th + k1[2] * dt / 2, thd: s.thd + k1[3] * dt / 2 }, k2 = deriv(s2, Ft, m, L);
+      const s3 = { x: s.x + k2[0] * dt / 2, xd: s.xd + k2[1] * dt / 2, th: s.th + k2[2] * dt / 2, thd: s.thd + k2[3] * dt / 2 }, k3 = deriv(s3, Ft, m, L);
+      const s4 = { x: s.x + k3[0] * dt, xd: s.xd + k3[1] * dt, th: s.th + k3[2] * dt, thd: s.thd + k3[3] * dt }, k4 = deriv(s4, Ft, m, L);
+      s.x += dt / 6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]); s.xd += dt / 6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
+      s.th += dt / 6 * (k1[2] + 2 * k2[2] + 2 * k3[2] + k4[2]); s.thd += dt / 6 * (k1[3] + 2 * k2[3] + 2 * k3[3] + k4[3]);
+      if (Math.abs(s.x) > TRACK) { s.x = Math.sign(s.x) * TRACK; s.xd = -0.2 * s.xd; s.thd += 0; s.status = 'crash'; s.crashT = s.t; }
+      st.t += dt;
+      const up = Math.abs(wrap(st.th)) < 0.35;
+      if (up) { st.bal += dt; if (mode.get() === 'manual') st.best = Math.max(st.best, st.bal); } else st.bal = 0;
+      st.status = s.crashT != null && s.t - s.crashT < 1 ? 'crash' : up ? 'ok' : st.swing ? 'swing' : 'fall';
+    }
+    let acc = 0, pushT = -1;
+    const L = CL.loop((rdt, paused) => {
+      if (!paused) { acc += rdt; let n = 0; while (acc >= dt && n++ < 60) { step(); acc -= dt; } if (n >= 60) acc = 0; }
+      if (st.t - pushT >= 0.03) {
+        pushT = st.t; const th = wrap(st.th);
+        const xv = [st.x - xt.get(), st.xd, th, st.thd]; let V = 0; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) V += xv[i] * Pm[i][j] * xv[j];
+        cTh.push(st.t, [th * 180 / Math.PI]); cX.push(st.t, [st.x, xt.get()]); cF.push(st.t, [st.F]); cV.push(st.t, [Math.abs(th) < 0.6 ? V : null]);
+        hist.push([th, st.thd]); if (hist.length > 400) hist.shift();
+      }
+      charts.forEach(c => c.draw()); draw(); explain();
+    }, S.pauseB);
+    const geo = { bx: 0 };
+    function draw() {
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
+      const pw = w > 700 ? w * 0.72 : w; const sc = (pw - 60) / (2 * TRACK + 0.6); const cx0 = 30 + (TRACK + 0.3) * sc; const ty = h * 0.78;
+      // rails
+      ctx.strokeStyle = css('--muted'); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(cx0 - (TRACK + .2) * sc, ty); ctx.lineTo(cx0 + (TRACK + .2) * sc, ty); ctx.stroke();
+      ctx.fillStyle = css('--err'); [-1, 1].forEach(sg => ctx.fillRect(cx0 + sg * (TRACK + .2) * sc - 5, ty - 30, 10, 34));
+      ctx.fillStyle = css('--ok'); ctx.beginPath(); ctx.moveTo(cx0 + xt.get() * sc, ty + 6); ctx.lineTo(cx0 + xt.get() * sc - 8, ty + 20); ctx.lineTo(cx0 + xt.get() * sc + 8, ty + 20); ctx.fill();
+      ctx.font = '11px Inter'; ctx.textAlign = 'center'; ctx.fillText('x*', cx0 + xt.get() * sc, ty + 33);
+      const bx = cx0 + st.x * sc; geo.bx = bx;
+      const sz = Math.max(40, sc * 0.35);
+      ctx.fillStyle = css('--sys'); CL.rrect(ctx, bx - sz / 2, ty - sz * .55, sz, sz * .5, 6); ctx.fill();
+      ctx.fillStyle = '#111'; [-1, 1].forEach(sg => { ctx.beginPath(); ctx.arc(bx + sg * sz * .3, ty - 4, 6, 0, 7); ctx.fill(); });
+      const pivY = ty - sz * .55; const Lp = Math.min(h * 0.62, sc * 1.1);
+      const px = bx + Lp * Math.sin(st.th), py = pivY - Lp * Math.cos(st.th);
+      const col = st.status === 'ok' ? css('--sys') : st.status === 'swing' ? css('--ai') : css('--err');
+      ctx.strokeStyle = col; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(bx, pivY); ctx.lineTo(px, py); ctx.stroke();
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, py, 6 + 10 * Math.sqrt(mp.get() / .2) * .8, 0, 7); ctx.fill();
+      ctx.strokeStyle = CL.alpha(css('--ok'), .5); ctx.setLineDash([4, 5]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bx, pivY); ctx.lineTo(bx, pivY - Lp); ctx.stroke(); ctx.setLineDash([]);
+      // force arrow
+      const fa = st.F / 40 * sc * 0.8; if (Math.abs(fa) > 3) CL.arrow(ctx, bx + Math.sign(fa) * sz / 2, ty - sz * .3, bx + Math.sign(fa) * sz / 2 + fa, ty - sz * .3, css('--ctl'), 5);
+      if (Math.abs(wnd) > .3) CL.arrow(ctx, bx - wnd * 8, ty - sz * .8, bx, ty - sz * .8, CL.alpha(css('--err'), .8), 2);
+      ctx.textAlign = 'left'; ctx.font = '700 18px "Space Grotesk",Inter'; ctx.fillStyle = col;
+      const lab = { ok: 'BALANCED', fall: mode.get() === 'auto' && !swing.get() ? 'OUTSIDE REGION OF ATTRACTION – controller off' : 'FALLING / DOWN', swing: 'SWINGING UP (energy control)', crash: 'HIT THE END STOP' }[st.status];
+      ctx.fillText(lab, 14, 28);
+      ctx.font = '13px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText(`θ = ${(wrap(st.th) * 180 / Math.PI).toFixed(1)}°   x = ${st.x.toFixed(2)} m   u = ${st.F.toFixed(1)} N`, 14, 48);
+      if (mode.get() === 'manual') { ctx.fillStyle = css('--ctl'); ctx.fillText('You are the controller: ← →  (click the scene to tap the pole)', 14, 68); }
+      // phase portrait
+      if (w > 700) {
+        const ox = w * 0.74, ow = w * 0.24, oy = 16, oh = h - 40; ctx.fillStyle = css('--panel'); CL.rrect(ctx, ox, oy, ow, oh, 10); ctx.fill();
+        ctx.fillStyle = css('--muted'); ctx.font = '600 12px Inter'; ctx.fillText('Phase portrait (θ, ω)', ox + 10, oy + 18);
+        const cxp = ox + ow / 2, cyp = oy + oh / 2 + 8, sx = ow / 2 / 0.8, sy = (oh / 2 - 20) / 4;
+        ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ox + 6, cyp); ctx.lineTo(ox + ow - 6, cyp); ctx.moveTo(cxp, oy + 26); ctx.lineTo(cxp, oy + oh - 6); ctx.stroke();
+        ctx.fillStyle = css('--ok'); ctx.beginPath(); ctx.arc(cxp, cyp, 5, 0, 7); ctx.fill(); ctx.font = '11px Inter'; ctx.fillText('goal', cxp + 7, cyp - 6);
+        ctx.save(); ctx.beginPath(); ctx.rect(ox, oy + 22, ow, oh - 22); ctx.clip();
+        ctx.strokeStyle = css('--sys'); ctx.lineWidth = 1.5; ctx.beginPath();
+        hist.forEach((p, i) => { const X = cxp + p[0] * sx, Y = cyp - p[1] * sy; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.stroke();
+        const lp = hist[hist.length - 1]; if (lp) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cxp + lp[0] * sx, cyp - lp[1] * sy, 5, 0, 7); ctx.fill(); }
+        ctx.restore(); ctx.fillStyle = css('--muted'); ctx.fillText('θ →', ox + ow - 30, cyp + 14); ctx.fillText('ω ↑', cxp + 4, oy + 34);
+      }
+    }
+    let lastEx = 0;
+    function explain() {
+      if (performance.now() - lastEx < 400) return; lastEx = performance.now();
+      const lab = { ok: 'Balanced', fall: 'Down', swing: 'Swing-up', crash: 'Crashed' }[st.status];
+      T.set('st', lab); T.color('st', st.status === 'ok' ? '--ok' : st.status === 'swing' ? '--ai' : '--err'); T.set('bal', st.bal.toFixed(1) + ' s'); T.set('best', st.best.toFixed(1) + ' s');
+      const m = [], md = mode.get();
+      if (md === 'off') m.push('No control: the upright equilibrium is unstable, so gravity wins and the pole falls to the stable hanging position.');
+      if (md === 'manual') m.push('Your brain is closing the loop: eyes are the sensor, your fingers the actuator. Your reaction time (~0.2 s) is a delay, which is why this is hard.');
+      if (md === 'auto') {
+        if (st.status === 'ok' && kx.get() === 0 && kv.get() === 0) m.push('The angle is stabilised, but nothing controls the cart position, so the cart drifts. Part of the state is uncontrolled.');
+        else if (st.status === 'ok') m.push(`Every ${(dt * 1000).toFixed(0)} ms the controller measures the full state and sets u = K·x. The purple V(x) curve going down shows the system losing “error energy”: a Lyapunov function.`);
+        if (kth.get() < (Mc + mp.get()) * g && kth.get() > 0) m.push(`Kθ is below (M+m)·g ≈ ${((Mc + mp.get()) * g).toFixed(1)} N/rad: the controller cannot push hard enough to beat gravity, whatever the other gains are.`);
+        if (st.status === 'swing') m.push('Far from upright, a nonlinear law pumps energy into the pole (like pumping a swing). Near the top it hands over to the linear LQR controller.');
+        if (Math.abs(st.F) >= fmax.get() - .01) m.push('<span style="color:var(--err)">Motor at its force limit (saturation).</span>');
+        if (mp.get() !== .2) m.push(`The real pole is ${mp.get()} kg but the gains were designed for 0.2 kg. Feedback gives robustness, within limits.`);
+      }
+      exT.innerHTML = m.map(s => `<p>${s}</p>`).join('');
+    }
+    return { stop: () => { L.stop(); window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); } };
+  }
+};
+
+APPS.robot = {
+  title: 'Autonomous Robot Challenge', concept: 'Trajectory tracking and safety', audience: 'All audiences', color: '--ok',
+  blurb: 'Three robots, one goal. One only chases the target; one adds a safety filter (control barrier function); one also accounts for wind and sensor noise. Reaching the goal is not the same as reaching it safely.',
+  mount(root, back) {
+    const { css, clamp, el, randn } = CL;
+    const S = CL.shell(root, { back, title: this.title, subtitle: 'Safety filter: choose u closest to u_nominal such that  ∇h·u ≥ −α·h  for every obstacle  (h ≥ 0 means safe)', tag: this.concept, audience: this.audience, color: this.color });
+    const W = 12, H = 7, RR = 0.25, ELL = 0.25, DT = 0.02;
+    const defs = [
+      { key: 'nom', name: 'Nominal (go to goal)', color: '--sys' },
+      { key: 'cbf', name: 'Safe (CBF filter)', color: '--ok' },
+      { key: 'rob', name: 'Robust safe (CBF + disturbance bound)', color: '--ai' },
+    ];
+    let obs = [{ x: 6, y: 3.5, r: 0.9 }, { x: 8.6, y: 2.2, r: 0.6 }, { x: 8.8, y: 5.0, r: 0.55 }, { x: 3.8, y: 5.6, r: 0.5 }];
+    let goal = { x: 11, y: 3.6 }, start = { x: 1, y: 3.4, phi: 0 };
+    let bots = [], t = 0;
+    const newRun = () => {
+      t = 0; bots = defs.map(d => ({ ...d, x: start.x, y: start.y, phi: start.phi, trail: [], col: 0, inCol: false, minC: Infinity, done: null, u: [0, 0], v: 0, w: 0, est: null, kick: [0, 0] }));
+      charts.forEach(c => c.clear());
+    };
+
+    const vis = el('div', { class: 'visual', style: 'aspect-ratio:12/7' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots two' }); S.left.append(pl);
+    const ser = n => defs.map(d => ({ name: d.key === 'nom' ? 'Nominal' : d.key === 'cbf' ? 'CBF' : 'Robust', color: d.color, dec: n }));
+    const cC = new CL.Chart(pl, { title: 'Clearance to nearest obstacle', yUnit: 'm', window: 25, minSpan: 1, zero: true, height: 140, series: ser(2) });
+    cC.extra = [{ y: 0, color: '--err', label: 'collision' }];
+    const cE = new CL.Chart(pl, { title: 'Tracking error (distance to goal)', yUnit: 'm', window: 25, minSpan: 1, yMin: 0, height: 140, series: ser(1) });
+    const cU = new CL.Chart(pl, { title: 'Control effort |u|', yUnit: 'm/s', window: 25, minSpan: .5, yMin: 0, height: 140, series: ser(2) });
+    const cH = new CL.Chart(pl, { title: 'Safety filter intervention |u − u_nom|', yUnit: 'm/s', window: 25, minSpan: .5, yMin: 0, height: 140, series: ser(2) });
+    const charts = [cC, cE, cU, cH];
+
+    const sc = CL.card(S.right, 'Safety status');
+    const statRows = {};
+    defs.forEach(d => { const r = el('div', { style: 'display:flex;align-items:center;gap:8px;margin:5px 0;font-size:.88rem' }); const b = el('span', { class: 'badge' }, '–'); const tx = el('span', { class: 'muted' }); r.append(el('i', { style: `width:12px;height:12px;border-radius:50%;background:var(${d.color});display:inline-block` }), el('span', { style: 'flex:1' }, d.name), b); sc.append(r, tx); statRows[d.key] = { b, tx }; });
+
+    const tc = CL.card(S.right, 'Build the scene (click the arena)');
+    const tool = CL.seg(tc, { options: [['goal', '🎯 Target'], ['add', '＋ Obstacle'], ['del', '✕ Remove'], ['start', '🤖 Start']], value: 'goal' });
+    const orad = CL.slider(tc, { label: 'New obstacle radius', min: .2, max: 1.2, step: .05, value: .5, dec: 2, unit: 'm' });
+    const show = {}; defs.forEach(d => show[d.key] = CL.check(tc, 'Show ' + d.name, true));
+    const tb = el('div', { class: 'btns' }); tc.append(tb);
+    CL.button(tb, '▶ Restart run', newRun, 'pri');
+    CL.button(tb, 'Random obstacles', () => { obs = []; for (let i = 0; i < 7; i++) { const o = { x: 2.5 + Math.random() * 7.5, y: .8 + Math.random() * 5.4, r: .3 + Math.random() * .6 }; if (Math.hypot(o.x - goal.x, o.y - goal.y) > o.r + .6 && Math.hypot(o.x - start.x, o.y - start.y) > o.r + .8) obs.push(o); } newRun(); });
+    CL.button(tb, 'Clear', () => { obs = []; newRun(); });
+    CL.button(tb, 'Narrow gap', () => { obs = [{ x: 6, y: 1.6, r: 1.25 }, { x: 6, y: 5.55, r: 1.25 }]; goal = { x: 11, y: 3.6 }; newRun(); });
+
+    const rc = CL.card(S.right, 'Robot and environment');
+    const vmax = CL.slider(rc, { label: 'Robot top speed', min: .2, max: 2.5, step: .1, value: 1.2, dec: 1, unit: 'm/s', color: '--ctl' });
+    const alpha = CL.slider(rc, { label: 'CBF aggressiveness α', min: .2, max: 5, step: .1, value: 1.5, dec: 1, color: '--ok', hint: 'Small α: start braking far from obstacles. Large α: allow approaching fast.' });
+    const noise = CL.slider(rc, { label: 'Position sensor noise σ', min: 0, max: .3, step: .01, value: .03, dec: 2, unit: 'm', color: '--err' });
+    const filt = CL.check(rc, 'State estimator (low-pass filter on measurements)', true);
+    const wind = CL.slider(rc, { label: 'Wind / slope drift', min: 0, max: .8, step: .05, value: 0, dec: 2, unit: 'm/s', color: '--err' });
+    const wdir = CL.slider(rc, { label: 'Drift direction', min: 0, max: 359, step: 1, value: 270, unit: '°', color: '--err', hint: '270° pushes downwards on screen' });
+    const dbound = CL.slider(rc, { label: 'Disturbance bound assumed by the robust robot', min: 0, max: 1, step: .05, value: .4, dec: 2, unit: 'm/s', color: '--ai' });
+    const nudge = CL.check(rc, 'Deadlock escape (small sideways bias)', true);
+    const kb = el('div', { class: 'btns' }); rc.append(kb);
+    CL.button(kb, '💥 Kick all robots', () => bots.forEach(b => { const a = Math.random() * 6.28; b.kick = [Math.cos(a) * 1.5, Math.sin(a) * 1.5]; }), 'warn');
+
+    const ex = CL.card(S.right, 'What you are seeing', 'explain'); const exT = el('div'); ex.append(exT);
+    CL.guide(S.right, [
+      { title: 'Reaching vs reaching safely', text: 'Press <b>Restart run</b>. The blue robot steers straight at the goal and drives through the obstacle (it does not even know it is there). Green and purple reach the goal <i>and</i> stay safe.', setup: () => { wind.set(0); noise.set(.03); newRun(); } },
+      { title: 'How the safety filter works', text: 'For each obstacle define h = distance² − (safe radius)². h ≥ 0 means safe. The filter makes the smallest change to the nominal command that keeps h from decreasing faster than α·h. Watch the “intervention” plot: zero when far away, positive near obstacles.' },
+      { title: 'Design your own course', text: 'Pick <b>＋ Obstacle</b> and click to place obstacles; pick <b>🎯 Target</b> to move the goal. Try a wall of obstacles across the path, or the <b>Narrow gap</b> preset.' },
+      { title: 'Add wind', text: 'Drift is now 0.5 m/s. The plain CBF robot assumed a perfect world, so the wind pushes it deep into the dashed safety zones (its clearance almost reaches zero). The robust robot budgets for disturbances up to 0.6 m/s and keeps a bigger buffer. Notice the price: it may refuse gaps the others squeeze through. Robustness costs performance. Also notice that all robots now stop short of the target: a purely proportional controller cannot cancel a constant push (remember the integral term?).', setup: () => { wind.set(.5); wdir.set(60); dbound.set(.6); newRun(); } },
+      { title: 'When the assumption is wrong', text: 'Set the drift to 0.8 m/s but leave the assumed bound at 0.6 m/s. Now even the robust robot can be pushed into an obstacle. Every guarantee holds only under its assumptions.', setup: () => { wind.set(.8); wdir.set(90); dbound.set(.6); newRun(); } },
+      { title: 'Noisy sensors', text: 'Raise sensor noise to 0.2 m and untick the estimator. Commands become jittery and safety erodes: you cannot be safe about a state you cannot measure well. Tick the estimator again.', setup: () => { noise.set(.2); filt.set(false); newRun(); } },
+      { title: 'Deadlock: an open research problem', text: 'Clear the arena, put one large obstacle exactly between start and goal, and untick deadlock escape. The safe robot may stop in front of it forever: safe, but useless. Safety filters can conflict with the task.', setup: () => { obs = [{ x: 6, y: 3.4, r: 1 }]; start = { x: 1, y: 3.4, phi: 0 }; goal = { x: 11, y: 3.4 }; nudge.set(false); wind.set(0); noise.set(0); newRun(); } },
+    ]);
+    S.resetB.onclick = () => { obs = [{ x: 6, y: 3.5, r: 0.9 }, { x: 8.6, y: 2.2, r: 0.6 }, { x: 8.8, y: 5.0, r: 0.55 }, { x: 3.8, y: 5.6, r: 0.5 }]; goal = { x: 11, y: 3.6 }; start = { x: 1, y: 3.4, phi: 0 }; newRun(); };
+    newRun();
+
+    let geo = { s: 1, ox: 0, oy: 0 };
+    cv.cv.addEventListener('pointerdown', e => {
+      const r = cv.cv.getBoundingClientRect(); const X = (e.clientX - r.left - geo.ox) / geo.s, Y = H - (e.clientY - r.top - geo.oy) / geo.s;
+      if (X < 0 || X > W || Y < 0 || Y > H) return;
+      const tl = tool.get();
+      if (tl === 'goal') { goal = { x: X, y: Y }; bots.forEach(b => b.done = null); }
+      else if (tl === 'add') obs.push({ x: X, y: Y, r: orad.get() });
+      else if (tl === 'del') { let bi = -1, bd = 1e9; obs.forEach((o, i) => { const d = Math.hypot(o.x - X, o.y - Y) - o.r; if (d < bd) { bd = d; bi = i; } }); if (bi >= 0 && bd < .5) obs.splice(bi, 1); }
+      else if (tl === 'start') { start = { x: X, y: Y, phi: Math.atan2(goal.y - Y, goal.x - X) }; newRun(); }
+    });
+
+    function qp(un, A, B) { // Hildreth: min |u-un|^2 s.t. A_i·u >= B_i
+      const lam = A.map(() => 0); let u = un.slice();
+      for (let it = 0; it < 60; it++) {
+        let chg = 0;
+        for (let i = 0; i < A.length; i++) {
+          const a = A[i], n2 = a[0] * a[0] + a[1] * a[1]; if (n2 < 1e-9) continue;
+          const viol = B[i] - (a[0] * u[0] + a[1] * u[1]);
+          const nl = Math.max(0, lam[i] + viol / n2), d = nl - lam[i];
+          if (d !== 0) { lam[i] = nl; u[0] += d * a[0]; u[1] += d * a[1]; chg += Math.abs(d); }
+        }
+        if (chg < 1e-7) break;
+      }
+      return u;
+    }
+    function stepBot(b, dvec) {
+      const pTrue = [b.x + ELL * Math.cos(b.phi), b.y + ELL * Math.sin(b.phi)];
+      const meas = [pTrue[0] + noise.get() * randn(), pTrue[1] + noise.get() * randn()];
+      if (!b.est || !filt.get()) b.est = meas.slice(); else { const k = 0.12; b.est[0] += k * (meas[0] - b.est[0]); b.est[1] += k * (meas[1] - b.est[1]); }
+      const p = b.est;
+      const ex = goal.x - p[0], ey = goal.y - p[1], dg = Math.hypot(ex, ey);
+      let un = [1.2 * ex, 1.2 * ey]; const nn = Math.hypot(...un); if (nn > vmax.get()) un = un.map(c => c * vmax.get() / nn);
+      if (dg < 0.12) un = [0, 0];
+      let u = un;
+      if (b.key !== 'nom' && obs.length) {
+        const A = [], B = [];
+        const sig = filt.get() ? noise.get() * 0.5 : noise.get();
+        let nearest = null, nd = 1e9;
+        obs.forEach(o => {
+          const R = o.r + RR + ELL + 0.05 + (b.key === 'rob' ? 2 * sig : 0);
+          const dx = p[0] - o.x, dy = p[1] - o.y, hh = dx * dx + dy * dy - R * R;
+          const a = [2 * dx, 2 * dy]; let rhs = -alpha.get() * hh;
+          if (b.key === 'rob') rhs += Math.hypot(a[0], a[1]) * dbound.get();
+          A.push(a); B.push(rhs);
+          if (hh < nd) { nd = hh; nearest = a; }
+        });
+        if (nudge.get() && nearest && dg > 0.5) { const s = Math.exp(-Math.max(0, nd) / 1.5) * 0.35 * vmax.get(); const nr = Math.hypot(...nearest) || 1; un = [un[0] - nearest[1] / nr * s, un[1] + nearest[0] / nr * s]; }
+        u = qp(un, A, B);
+        const n2 = Math.hypot(...u), lim = vmax.get() * 1.15; if (n2 > lim) u = u.map(c => c * lim / n2);
+      }
+      b.u = u; b.un = un;
+      // unicycle conversion
+      let v = Math.cos(b.phi) * u[0] + Math.sin(b.phi) * u[1];
+      let w = (-Math.sin(b.phi) * u[0] + Math.cos(b.phi) * u[1]) / ELL;
+      v = clamp(v, -vmax.get() * 1.2, vmax.get() * 1.2); w = clamp(w, -4, 4); b.v = v; b.w = w;
+      b.x += (v * Math.cos(b.phi) + dvec[0] + b.kick[0]) * DT; b.y += (v * Math.sin(b.phi) + dvec[1] + b.kick[1]) * DT; b.phi += w * DT;
+      b.kick = b.kick.map(c => c * 0.9);
+      b.x = clamp(b.x, RR, W - RR); b.y = clamp(b.y, RR, H - RR);
+      // collisions (body)
+      let minc = Infinity, hit = false;
+      obs.forEach(o => { const d = Math.hypot(b.x - o.x, b.y - o.y) - o.r - RR; minc = Math.min(minc, d); if (d < 0) { hit = true; } });
+      if (hit && !b.inCol) b.col++; b.inCol = hit; b.clear = minc; b.minC = Math.min(b.minC, minc);
+      b.dg = Math.hypot(goal.x - b.x, goal.y - b.y);
+      if (b.done == null && b.dg < 0.4) b.done = t;
+      b.trail.push([b.x, b.y, hit]); if (b.trail.length > 1500) b.trail.shift();
+    }
+    let acc = 0, pushT = -1;
+    const L = CL.loop((rdt, paused) => {
+      if (!paused) {
+        acc += rdt;
+        while (acc >= DT) {
+          const a = wdir.get() * Math.PI / 180, dv = [wind.get() * Math.cos(a), wind.get() * Math.sin(a)];
+          bots.forEach(b => stepBot(b, dv)); t += DT; acc -= DT;
+        }
+      }
+      if (t - pushT > .05) {
+        pushT = t;
+        const vis = k => show[k].get();
+        cC.push(t, bots.map(b => vis(b.key) && isFinite(b.clear) ? b.clear : null)); cE.push(t, bots.map(b => vis(b.key) ? b.dg : null));
+        cU.push(t, bots.map(b => vis(b.key) ? Math.hypot(...b.u) : null)); cH.push(t, bots.map(b => vis(b.key) && b.un ? Math.hypot(b.u[0] - b.un[0], b.u[1] - b.un[1]) : null));
+      }
+      charts.forEach(c => c.draw()); draw(); status();
+    }, S.pauseB);
+
+    function draw() {
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
+      const s = Math.min(w / W, h / H); const ox = (w - W * s) / 2, oy = (h - H * s) / 2; geo = { s, ox, oy };
+      const X = x => ox + x * s, Y = y => oy + (H - y) * s;
+      ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1;
+      for (let i = 0; i <= W; i++) { ctx.beginPath(); ctx.moveTo(X(i), Y(0)); ctx.lineTo(X(i), Y(H)); ctx.stroke(); }
+      for (let j = 0; j <= H; j++) { ctx.beginPath(); ctx.moveTo(X(0), Y(j)); ctx.lineTo(X(W), Y(j)); ctx.stroke(); }
+      ctx.strokeStyle = css('--muted'); ctx.lineWidth = 2; ctx.strokeRect(X(0), Y(H), W * s, H * s);
+      // obstacles + safety halo
+      obs.forEach(o => {
+        ctx.fillStyle = CL.alpha(css('--err'), .12); ctx.beginPath(); ctx.arc(X(o.x), Y(o.y), (o.r + RR + ELL + .05) * s, 0, 7); ctx.fill();
+        ctx.setLineDash([4, 4]); ctx.strokeStyle = CL.alpha(css('--err'), .5); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = CL.alpha(css('--err'), .75); ctx.beginPath(); ctx.arc(X(o.x), Y(o.y), o.r * s, 0, 7); ctx.fill();
+      });
+      // drift arrow
+      if (wind.get() > 0) { const a = wdir.get() * Math.PI / 180; const cx = X(W - 1), cy = Y(H - 1); CL.arrow(ctx, cx - Math.cos(a) * 25, cy + Math.sin(a) * 25, cx + Math.cos(a) * 25, cy - Math.sin(a) * 25, css('--err'), 3); ctx.fillStyle = css('--err'); ctx.font = '600 11px Inter'; ctx.textAlign = 'center'; ctx.fillText('drift', cx, cy + 40); }
+      // goal
+      ctx.strokeStyle = css('--ok'); ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(X(goal.x), Y(goal.y), .4 * s, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.arc(X(goal.x), Y(goal.y), .15 * s, 0, 7); ctx.fillStyle = css('--ok'); ctx.fill();
+      ctx.font = '600 12px Inter'; ctx.textAlign = 'center'; ctx.fillText('target', X(goal.x), Y(goal.y) - .5 * s);
+      ctx.fillStyle = css('--muted'); ctx.fillText('start', X(start.x), Y(start.y) + .55 * s);
+      bots.forEach(b => {
+        if (!show[b.key].get()) return;
+        const col = css(b.color);
+        ctx.lineWidth = 2.5; ctx.strokeStyle = col; ctx.globalAlpha = .8; ctx.beginPath();
+        b.trail.forEach((p, i) => i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1]))); ctx.stroke(); ctx.globalAlpha = 1;
+        b.trail.forEach(p => { if (p[2]) { ctx.fillStyle = css('--err'); ctx.fillRect(X(p[0]) - 2, Y(p[1]) - 2, 4, 4); } });
+        ctx.save(); ctx.translate(X(b.x), Y(b.y)); ctx.rotate(-b.phi);
+        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, 0, RR * s, 0, 7); ctx.fill();
+        if (b.inCol) { ctx.strokeStyle = css('--err'); ctx.lineWidth = 4; ctx.stroke(); }
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(RR * s * .9, 0); ctx.lineTo(-RR * s * .3, RR * s * .45); ctx.lineTo(-RR * s * .3, -RR * s * .45); ctx.fill();
+        ctx.restore();
+        if (b.est && noise.get() > 0) { ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(X(b.est[0]), Y(b.est[1]), 3, 0, 7); ctx.stroke(); }
+      });
+      ctx.textAlign = 'left'; ctx.fillStyle = css('--muted'); ctx.font = '12px Inter'; ctx.fillText(`t = ${t.toFixed(1)} s   •   tool: ${tool.get()}   •   dashed ring = safety zone used by the filter`, X(0) + 8, Y(0) - 8);
+    }
+    let lastS = 0;
+    function status() {
+      if (performance.now() - lastS < 300) return; lastS = performance.now();
+      bots.forEach(b => {
+        const r = statRows[b.key]; let lab, c;
+        if (b.inCol) { lab = 'COLLISION'; c = '--err'; } else if (b.clear < .15) { lab = 'CAUTION'; c = '--warn'; } else { lab = 'SAFE'; c = '--ok'; }
+        r.b.textContent = lab; r.b.style.background = CL.alpha(css(c), .18); r.b.style.color = css(c);
+        r.tx.textContent = `collisions ${b.col} · min clearance ${isFinite(b.minC) ? b.minC.toFixed(2) + ' m' : '–'} · ${b.done != null ? 'reached goal at ' + b.done.toFixed(1) + ' s' : 'distance to goal ' + b.dg?.toFixed(1) + ' m'}`;
+        r.tx.style.cssText = 'display:block;font-size:.78rem;margin:-2px 0 6px 20px';
+      });
+      const [n, c, r] = bots, m = [];
+      if (n.col > 0) m.push(`The <b>nominal</b> robot has collided ${n.col}× — it optimises one objective (reach the goal) and nothing else.`);
+      if (c.minC < 0 && wind.get() > 0) m.push('The <b>CBF</b> robot assumed no disturbance, so the drift pushed it inside the obstacle margin. A safety guarantee is only as good as its model.');
+      else if (c.col === 0 && obs.length) m.push('The <b>CBF</b> robot only modifies the command when an obstacle is close; elsewhere it behaves exactly like the nominal one.');
+      if (r.col === 0 && wind.get() > 0) m.push(`The <b>robust</b> robot keeps a larger buffer because it assumes disturbances up to ${dbound.get()} m/s. ${dbound.get() < wind.get() ? '<span style="color:var(--err)">But the true drift is larger than its assumed bound — its guarantee no longer holds.</span>' : 'Its price: longer, slower paths.'}`);
+      if (wind.get() > 0 && c.done == null && c.dg < 1.5) m.push('Under drift, the robots settle short of the target: proportional control leaves a <b>steady-state error</b> against a constant disturbance.');
+      if (r.done == null && t > 15 && r.dg > 2 && r.col === 0) m.push('The robust robot is being very cautious: with its larger margins, some gaps look too narrow. That is the price of robustness.');
+      if (c.done == null && t > 25 && c.dg > 1.5) m.push('The safe robot is stuck: the safety constraint and the goal pull in opposite directions (a <b>deadlock</b>).');
+      exT.innerHTML = m.map(s => `<p>${s}</p>`).join('') || '<p>Click the arena to move the target or add obstacles, then restart the run.</p>';
+    }
+    return { stop: L.stop };
+  }
+};
+
+APPS.energy = {
+  title: 'Smart Home Energy Manager: Rules vs Model Predictive Control', concept: 'Optimisation and predictive control', audience: 'Advanced', color: '--ai',
+  blurb: 'A home with rooftop solar, a battery and an electric car on a time-of-use tariff. A simple rule-based controller competes with MPC, which re-plans every hour using forecasts.',
+  mount(root, back) {
+    const { css, clamp, el } = CL;
+    const S = CL.shell(root, { back, title: this.title, subtitle: 'MPC: at every hour, optimise the next N hours using forecasts → apply only the first decision → measure → repeat', tag: this.concept, audience: this.audience, color: this.color });
+    const HRS = 48, BCAP = 10, BSTEP = 0.5, NB = Math.round(BCAP / BSTEP) + 1, ETA = 0.95, EVSTEP = 2, EVP = [0, 2, 4, 6], PLUG = 18, DEPART = 31, EXP = 3;
+    const price = h => { const hh = h % 24; return hh >= 22 || hh < 6 ? 5 : hh >= 17 ? 11 : 7.5; };
+    const loadP = h => { const hh = h % 24; return 0.55 + 1.3 * Math.exp(-((hh - 8) ** 2) / 3) + 2.4 * Math.exp(-((hh - 20.5) ** 2) / 4) + 0.35 * Math.exp(-((hh - 13) ** 2) / 8) + (h >= 24 ? 0.1 : 0); };
+    const pvClear = h => { const hh = h % 24; return hh <= 6 || hh >= 18 ? 0 : 5 * Math.pow(Math.sin(Math.PI * (hh - 6) / 12), 1.4); };
+    let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+
+    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/6.4' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const tr = el('div', { class: 'card' }); S.left.append(tr);
+    const playRow = el('div', { class: 'btns', style: 'align-items:center' }); tr.append(playRow);
+    let playing = true; const playB = CL.button(playRow, '❚❚ Pause playback', () => { playing = !playing; playB.textContent = playing ? '❚❚ Pause playback' : '▶ Play'; });
+    const hourS = el('input', { type: 'range', min: 0, max: HRS - 1, step: 1, value: 0, style: 'flex:1;min-width:200px' }); playRow.append(hourS);
+    const hourL = el('b', { style: 'min-width:150px' }); playRow.append(hourL);
+    const pl = el('div', { class: 'plots two' }); S.left.append(pl);
+    const xf = x => { const d = Math.floor(x / 24) + 1, hh = Math.round(x % 24); return hh === 0 ? 'Day ' + d : hh + 'h'; };
+    const cA = new CL.Chart(pl, { title: 'Solar & load (kW), price (₹/kWh)', yUnit: '', height: 160, xFmt: xf, minSpan: 4, yMin: 0, series: [{ name: 'Solar (actual)', color: '--warn' }, { name: 'Solar forecast', color: '--warn', dash: [4, 4], alpha: .7 }, { name: 'Load', color: '--sys' }, { name: 'Price', color: '--err', width: 1.5, alpha: .8 }] });
+    const cG = new CL.Chart(pl, { title: 'Grid import (+) / export (−)', yUnit: 'kW', height: 160, xFmt: xf, minSpan: 4, zero: true, series: [{ name: 'Rule-based', color: '--muted' }, { name: 'MPC', color: '--ai' }] });
+    const cB = new CL.Chart(pl, { title: 'Home battery state of charge', yUnit: 'kWh', height: 160, xFmt: xf, yMin: 0, yMax: BCAP, series: [{ name: 'Rule-based', color: '--muted' }, { name: 'MPC', color: '--ai' }, { name: 'MPC plan', color: '--ai', dash: [3, 3], width: 3, alpha: .6 }] });
+    const cE = new CL.Chart(pl, { title: 'Electric car: energy charged', yUnit: 'kWh', height: 160, xFmt: xf, yMin: 0, series: [{ name: 'Rule-based', color: '--muted' }, { name: 'MPC', color: '--ai' }, { name: 'Needed by 7am', color: '--ok', dash: [6, 4] }] });
+    const cC = new CL.Chart(pl, { title: 'Cumulative electricity bill', yUnit: '₹', height: 160, xFmt: xf, minSpan: 50, zero: true, series: [{ name: 'Rule-based', color: '--muted' }, { name: 'MPC', color: '--ai' }] });
+    const cP = new CL.Chart(pl, { title: 'Control actions (MPC)', yUnit: 'kW', height: 160, xFmt: xf, minSpan: 4, zero: true, series: [{ name: 'Battery charge(+)/discharge(−)', color: '--ctl' }, { name: 'Car charging', color: '--ctl', dash: [4, 3] }] });
+    const charts = [cA, cG, cB, cE, cC, cP];
+
+    const tc = CL.card(S.right, 'Score after 48 hours');
+    const Tt = CL.tiles(tc, [['cr', 'Bill: rules', '--muted'], ['cm', 'Bill: MPC', '--ai'], ['sv', 'Saving', '--ok'], ['ov', 'Overload h (R/M)', '--err'], ['pk', 'Peak kW (R/M)', '--sys'], ['ev', 'Car ready? (R/M)', '--ok']]);
+    const mc = CL.card(S.right, 'MPC settings');
+    const N = CL.slider(mc, { label: 'Prediction horizon N', min: 1, max: 24, step: 1, value: 12, unit: 'h', color: '--ai', hint: 'N = 1 is short-sighted. Longer horizons see tonight\'s peak price coming.' });
+    const fe = CL.slider(mc, { label: 'Solar forecast error', min: 0, max: 60, step: 5, value: 15, unit: '%', color: '--err' });
+    const wear = CL.slider(mc, { label: 'Battery wear cost', min: 0, max: 4, step: .25, value: 1, dec: 2, unit: '₹/kWh cycled', color: '--ctl' });
+    const sc = CL.card(S.right, 'Scenario');
+    const evNeed = CL.slider(sc, { label: 'Car needs (plugged in 6 pm, leaves 7 am)', min: 0, max: 40, step: 2, value: 30, unit: 'kWh', color: '--ok' });
+    const glim = CL.slider(sc, { label: 'Grid connection limit', min: 4, max: 12, step: .5, value: 7, dec: 1, unit: 'kW', color: '--err' });
+    const cloud = CL.slider(sc, { label: 'Day 2 cloud cover', min: 0, max: 90, step: 10, value: 60, unit: '%', color: '--err' });
+    const soc0 = CL.slider(sc, { label: 'Battery at start', min: 1, max: 10, step: .5, value: 5, dec: 1, unit: 'kWh', color: '--sys' });
+    [N, fe, wear, evNeed, glim, cloud, soc0].forEach(s => s.input.addEventListener('change', recompute));
+    const ex = CL.card(S.right, 'What you are seeing', 'explain'); const exT = el('div'); ex.append(exT);
+    CL.guide(S.right, [
+      { title: 'The rule-based controller', text: 'Grey lines follow simple rules: charge the car at full power as soon as it is plugged in; charge the battery from surplus solar; discharge it whenever the house needs power. Sensible, but blind to the future.' },
+      { title: 'MPC looks ahead', text: 'Purple lines come from MPC. Scrub to the afternoon of day 1: the dotted purple line is the <b>plan</b> MPC made at that hour. It saves battery energy for the expensive 5–10 pm peak and charges the car after 10 pm, when power is cheap.', setup: () => { setHour(15); } },
+      { title: 'Receding horizon', text: 'Press play and watch the dotted plan: it is recomputed <i>every hour</i> with new measurements. The plan is never executed in full — only its first step. That is what makes MPC a feedback controller.' },
+      { title: 'Constraints are first-class citizens', text: 'Reduce the grid limit to 5 kW. Charging the car at full power on top of the evening load overloads the connection (red hours). MPC spreads the charging out because the limit is part of its optimisation problem.', setup: () => { glim.set(5); recompute(); } },
+      { title: 'Short-sighted vs far-sighted', text: 'Set the horizon to 1 h, then 6 h, then 24 h. Watch the saving grow. With a short horizon MPC cannot “see” the evening peak or the departure deadline.', setup: () => { N.set(1); recompute(); } },
+      { title: 'Bad forecasts', text: 'Increase the forecast error to 60 %. MPC is only as good as its predictions, but because it re-plans every hour it still corrects many mistakes. This is the price and power of model-based control.', setup: () => { N.set(12); fe.set(60); recompute(); } },
+    ]);
+    S.resetB.onclick = () => { N.set(12); fe.set(15); wear.set(1); evNeed.set(30); glim.set(7); cloud.set(60); soc0.set(5); recompute(); setHour(0); };
+
+    let R = null, hour = 0;
+    function profiles() {
+      seed = 11; const pv = [], pvF = [], ld = [];
+      const cl = cloud.get() / 100;
+      for (let h = 0; h < HRS + 24; h++) {
+        const day2 = h >= 24 && h < 48; const c = day2 ? (1 - cl * (0.7 + 0.3 * rnd())) : (0.92 + 0.08 * rnd());
+        pv.push(pvClear(h) * c); ld.push(loadP(h) * (0.9 + 0.2 * rnd()));
+      }
+      const fseeds = []; for (let k = 0; k < HRS; k++) { const row = []; for (let j = 0; j < 24; j++) row.push((rnd() * 2 - 1)); fseeds.push(row); }
+      return { pv, ld, fseeds };
+    }
+    function stageGrid(load, pv, dB, ev) { return load + ev + (dB > 0 ? dB / ETA : dB * ETA) - pv; }
+    function stageCost(h, g, dB) { const lim = glim.get(); let c = g >= 0 ? g * price(h) : g * EXP; if (g > lim) c += (g - lim) * 200; return c + Math.abs(dB) * wear.get(); }
+    function solveDP(k, b0, e0, P) { // returns first action and plan
+      const n = Math.min(N.get(), HRS - k); const need = evNeed.get(), NE = Math.round(need / EVSTEP) + 1;
+      const err = fe.get() / 100;
+      const pvF = j => Math.max(0, P.pv[k + j] * (j === 0 ? 1 : (1 + err * P.fseeds[k][j])));
+      const ldF = j => j === 0 ? P.ld[k] : loadP(k + j);
+      let V = new Float64Array(NB * NE);
+      for (let b = 0; b < NB; b++) for (let e = 0; e < NE; e++) {
+        let c = -b * BSTEP * 6.5; // terminal value of stored energy
+        const hEnd = k + n, rem = need - e * EVSTEP;
+        if (hEnd <= DEPART && hEnd > PLUG) { const left = DEPART - hEnd; if (rem > left * EVP[EVP.length - 1] + 1e-9) c += 1e5; else c += rem * 5; }
+        else if (hEnd > DEPART && rem > 1e-9 && k < DEPART) c += 1e5;
+        V[b * NE + e] = c;
+      }
+      const pol = [];
+      for (let j = n - 1; j >= 0; j--) {
+        const h = k + j, Vn = new Float64Array(NB * NE).fill(Infinity), A = new Int16Array(NB * NE * 2);
+        const plugged = h >= PLUG && h < DEPART, pv = pvF(j), ld = ldF(j);
+        for (let b = 0; b < NB; b++) for (let e = 0; e < NE; e++) {
+          let best = Infinity, ba = 0, bev = 0;
+          for (let db = -6; db <= 6; db++) { const b2 = b + db; if (b2 < 0 || b2 >= NB) continue; const dB = db * BSTEP;
+            for (let a = 0; a < (plugged ? EVP.length : 1); a++) { const e2 = Math.min(NE - 1, e + EVP[a] / EVSTEP); const evE = (e2 - e) * EVSTEP;
+              const g = stageGrid(ld, pv, dB, evE); const c = stageCost(h, g, dB) + V[b2 * NE + e2];
+              if (c < best) { best = c; ba = db; bev = e2 - e; } } }
+          Vn[b * NE + e] = best; A[(b * NE + e) * 2] = ba; A[(b * NE + e) * 2 + 1] = bev;
+        }
+        pol[j] = A; V = Vn;
+      }
+      // roll out plan
+      let b = b0, e = e0; const plan = [b * BSTEP];
+      let first = null;
+      for (let j = 0; j < n; j++) { const i = (b * NE + e) * 2; const db = pol[j][i], de = pol[j][i + 1]; if (j === 0) first = [db, de]; b += db; e += de; plan.push(b * BSTEP); }
+      return { first, plan };
+    }
+    function recompute() {
+      const P = profiles(); const need = evNeed.get(); const NE = Math.round(need / EVSTEP) + 1; const lim = glim.get();
+      const out = { rule: { g: [], b: [], e: [], c: [], ov: 0, pk: 0 }, mpc: { g: [], b: [], e: [], c: [], ov: 0, pk: 0, db: [], ev: [], plans: [] }, P };
+      // rule-based
+      let b = soc0.get(), e = 0, cost = 0;
+      for (let h = 0; h < HRS; h++) {
+        const plugged = h >= PLUG && h < DEPART; const ev = plugged ? Math.min(7.2, need - e) : 0; e += ev;
+        const net = P.ld[h] + ev - P.pv[h]; let dB = 0;
+        if (net < 0) dB = Math.min(-net * ETA, 3.3, BCAP * .95 - b); else dB = -Math.min(net / ETA, 3.3, b - BCAP * .1);
+        dB = Math.max(dB, -b); b += dB;
+        const g = stageGrid(P.ld[h], P.pv[h], dB, ev); cost += (g >= 0 ? g * price(h) : g * EXP) + Math.abs(dB) * wear.get();
+        if (g > lim + 1e-6) out.rule.ov++; out.rule.pk = Math.max(out.rule.pk, g);
+        out.rule.g.push(g); out.rule.b.push(b); out.rule.e.push(e); out.rule.c.push(cost);
+      }
+      out.rule.ready = e >= need - 1e-6;
+      // MPC
+      let bi = Math.round(soc0.get() / BSTEP), ei = 0; cost = 0;
+      for (let h = 0; h < HRS; h++) {
+        const { first, plan } = solveDP(h, bi, ei, P);
+        const dB = first[0] * BSTEP, ev = first[1] * EVSTEP; bi += first[0]; ei = Math.min(NE - 1, ei + first[1]);
+        const g = stageGrid(P.ld[h], P.pv[h], dB, ev); cost += (g >= 0 ? g * price(h) : g * EXP) + Math.abs(dB) * wear.get();
+        if (g > lim + 1e-6) out.mpc.ov++; out.mpc.pk = Math.max(out.mpc.pk, g);
+        out.mpc.g.push(g); out.mpc.b.push(bi * BSTEP); out.mpc.e.push(ei * EVSTEP); out.mpc.c.push(cost); out.mpc.db.push(dB); out.mpc.ev.push(ev); out.mpc.plans.push(plan);
+      }
+      out.mpc.ready = ei * EVSTEP >= need - 1e-6;
+      R = out; render();
+    }
+    function render() {
+      if (!R) return; const xs = [...Array(HRS).keys()].map(i => i + 0.5), xs1 = xs.map(x => x + 0.5);
+      const P = R.P, err = fe.get() / 100;
+      const pvF = xs.map((_, h) => h < hour ? null : Math.max(0, P.pv[h] * (h === hour ? 1 : 1 + err * P.fseeds[hour][Math.min(23, h - hour)])));
+      cA.setData(xs, [P.pv.slice(0, HRS), pvF.map((v, h) => h - hour < N.get() ? v : null), P.ld.slice(0, HRS), xs.map((_, h) => price(h))]);
+      cG.setData(xs, [R.rule.g, R.mpc.g]); cG.extra = [{ y: glim.get(), color: '--err', label: 'grid limit' }];
+      const plan = R.mpc.plans[hour], pl = xs1.map((_, h) => h >= hour && h - hour < plan.length - 1 ? plan[h - hour + 1] : null);
+      cB.setData(xs1, [R.rule.b, R.mpc.b, pl]);
+      cE.setData(xs1, [R.rule.e, R.mpc.e, xs1.map(x => x <= DEPART + .5 && x >= PLUG ? evNeed.get() : null)]);
+      cC.setData(xs1, [R.rule.c, R.mpc.c]); cP.setData(xs, [R.mpc.db, R.mpc.ev]);
+      charts.forEach(c => { c.vline = hour + 0.5; c.draw([0, HRS]); });
+      const cr = R.rule.c[HRS - 1], cm = R.mpc.c[HRS - 1];
+      Tt.set('cr', '₹' + cr.toFixed(0)); Tt.set('cm', '₹' + cm.toFixed(0)); Tt.set('sv', (cr > 0 ? ((cr - cm) / cr * 100).toFixed(0) + ' %' : '₹' + (cr - cm).toFixed(0)));
+      Tt.set('ov', R.rule.ov + ' / ' + R.mpc.ov); Tt.set('pk', R.rule.pk.toFixed(1) + ' / ' + R.mpc.pk.toFixed(1)); Tt.set('ev', (R.rule.ready ? '✓' : '✗') + ' / ' + (R.mpc.ready ? '✓' : '✗'));
+      const d = Math.floor(hour / 24) + 1; hourL.textContent = `Day ${d}, ${String(hour % 24).padStart(2, '0')}:00–${String((hour % 24) + 1).padStart(2, '0')}:00 · ₹${price(hour)}/kWh`;
+      const m = [];
+      const hh = hour % 24;
+      if (hh >= 17 && hh < 22) m.push('Peak price hours. MPC drains the battery it saved earlier; the rule-based battery may already be empty.');
+      if (hour >= PLUG && hour < DEPART) m.push(R.mpc.ev[hour] > 0 ? `MPC is charging the car at ${R.mpc.ev[hour]} kW now${price(hour) <= 5 ? ' — cheap night power' : ''}.` : 'The car is plugged in, but MPC waits: its plan finishes charging later, at lower prices, still before 7 am.');
+      if (R.rule.g[hour] > glim.get()) m.push(`<span style="color:var(--err)">The rule-based home is drawing ${R.rule.g[hour].toFixed(1)} kW, above the ${glim.get()} kW limit.</span>`);
+      if (N.get() < 4) m.push('With such a short horizon, MPC behaves almost like a greedy rule: it cannot anticipate.');
+      m.push(`<span class="muted">Profiles are illustrative (5 kWp solar, 10 kWh battery, 6–7 kW charger, ₹5 / 7.5 / 11 time-of-use tariff, ₹3 export). MPC is solved exactly by dynamic programming on a grid.</span>`);
+      exT.innerHTML = m.map(s => `<p>${s}</p>`).join('');
+    }
+    function setHour(h) { hour = clamp(h, 0, HRS - 1); hourS.value = hour; render(); }
+    hourS.oninput = () => { playing = false; playB.textContent = '▶ Play'; setHour(+hourS.value); };
+    recompute();
+    let acc = 0, ph = 0;
+    const L = CL.loop((rdt, paused) => {
+      if (playing && !paused) { acc += rdt; if (acc > 0.7) { acc = 0; setHour((hour + 1) % HRS); } }
+      ph += rdt; draw();
+    }, S.pauseB);
+
+    function draw() {
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h); if (!R) return;
+      const P = R.P, k = hour, hh = k % 24;
+      const night = hh < 6 || hh >= 19; const sky = ctx.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, night ? 'rgba(20,30,70,.5)' : CL.alpha(css('--sys'), .25)); sky.addColorStop(1, 'transparent'); ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+      const half = w / 2;
+      const panel = (x0, title, g, dB, ev, col) => {
+        ctx.fillStyle = col; ctx.font = '700 15px "Space Grotesk",Inter'; ctx.textAlign = 'center'; ctx.fillText(title, x0 + half / 2, 22);
+        const cx = x0 + half / 2, cy = h * 0.56, s = Math.min(half / 360, h / 230);
+        // house
+        ctx.fillStyle = css('--panel'); ctx.strokeStyle = css('--muted'); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(cx - 55 * s, cy - 10 * s); ctx.lineTo(cx, cy - 55 * s); ctx.lineTo(cx + 55 * s, cy - 10 * s); ctx.lineTo(cx + 45 * s, cy - 10 * s); ctx.lineTo(cx + 45 * s, cy + 45 * s); ctx.lineTo(cx - 45 * s, cy + 45 * s); ctx.lineTo(cx - 45 * s, cy - 10 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = css('--sys'); ctx.font = `600 ${11 * s + 2}px Inter`; ctx.fillText(`home ${P.ld[k].toFixed(1)} kW`, cx, cy + 20 * s);
+        const node = (x, y, lab, val, c) => { ctx.fillStyle = css(c); ctx.beginPath(); ctx.arc(x, y, 20 * s, 0, 7); ctx.globalAlpha = .2; ctx.fill(); ctx.globalAlpha = 1; ctx.font = `600 ${10 * s + 2}px Inter`; ctx.fillText(lab, x, y - 25 * s); ctx.font = `700 ${11 * s + 3}px "Space Grotesk"`; ctx.fillText(val, x, y + 5 * s); };
+        const flow = (x0, y0, x1, y1, p, c) => { if (Math.abs(p) < 0.05) { ctx.strokeStyle = css('--grid'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); return; }
+          const [a, b2, c2, d] = p > 0 ? [x0, y0, x1, y1] : [x1, y1, x0, y0]; ctx.strokeStyle = css(c); ctx.lineWidth = 2 + Math.abs(p) * 1.2; ctx.setLineDash([8, 8]); ctx.lineDashOffset = -ph * 40; ctx.beginPath(); ctx.moveTo(a, b2); ctx.lineTo(c2, d); ctx.stroke(); ctx.setLineDash([]); };
+        const sunX = cx - 120 * s, sunY = cy - 50 * s, gX = cx + 130 * s, gY = cy - 40 * s, bX = cx - 120 * s, bY = cy + 55 * s, eX = cx + 130 * s, eY = cy + 55 * s;
+        flow(sunX, sunY, cx - 45 * s, cy - 5 * s, P.pv[k], '--warn'); node(sunX, sunY, 'solar', P.pv[k].toFixed(1), '--warn');
+        flow(gX, gY, cx + 45 * s, cy - 5 * s, g, g > glim.get() ? '--err' : '--sys'); node(gX, gY, 'grid ₹' + price(k), (g >= 0 ? '+' : '') + g.toFixed(1), g > glim.get() ? '--err' : '--sys');
+        flow(cx - 45 * s, cy + 35 * s, bX, bY, dB, '--ctl'); node(bX, bY, 'battery', (dB >= 0 ? '+' : '') + dB.toFixed(1), '--ctl');
+        flow(cx + 45 * s, cy + 35 * s, eX, eY, ev, '--ctl'); node(eX, eY, k >= PLUG && k < DEPART ? 'car 🔌' : 'car (away)', ev.toFixed(1), '--ctl');
+      };
+      panel(0, 'Rule-based', R.rule.g[k], R.rule.b[k] - (k ? R.rule.b[k - 1] : soc0.get()), k >= PLUG && k < DEPART ? R.rule.e[k] - (k ? R.rule.e[k - 1] : 0) : 0, css('--muted'));
+      panel(half, 'Model Predictive Control', R.mpc.g[k], R.mpc.db[k], R.mpc.ev[k], css('--ai'));
+      ctx.strokeStyle = css('--line'); ctx.beginPath(); ctx.moveTo(half, 30); ctx.lineTo(half, h - 10); ctx.stroke();
+      ctx.font = '600 13px Inter'; ctx.textAlign = 'left'; ctx.fillStyle = css('--muted'); ctx.fillText(`Day ${Math.floor(k / 24) + 1}  ${String(hh).padStart(2, '0')}:00   (kW)`, 10, h - 10);
+    }
+    return { stop: L.stop };
+  }
+};
+
+/* School mini-games */
+function gameShell(root, back, o) {
+  const S = CL.shell(root, { back, title: o.title, subtitle: o.subtitle, tag: 'Mini-game', audience: 'School students', color: o.color });
+  return S;
+}
+
+APPS['game-shower'] = {
+  title: 'Game: The Perfect Shower', concept: 'Feedback with delay', audience: 'School (Class 8–12)', color: '--ctl', game: true,
+  blurb: 'Keep the shower between 37 °C and 40 °C for 60 seconds. The catch: hot water takes 2 seconds to reach you. Then watch a controller try.',
+  mount(root, back) {
+    const { css, clamp, el, randn } = CL;
+    const S = gameShell(root, back, { title: this.title, subtitle: 'You are the controller. Your skin is the sensor. The tap is the actuator.', color: this.color });
+    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/7' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots' }); S.left.append(pl);
+    const ch = new CL.Chart(pl, { title: 'Water temperature at your head', yUnit: '°C', window: 60, yMin: 20, yMax: 55, series: [{ name: 'Temperature', color: '--sys' }, { name: 'Tap setting (scaled)', color: '--ctl', dash: [4, 3], dec: 0, noscale: true }] });
+    ch.extra = [{ y: 40, color: '--ok', label: '' }, { y: 37, color: '--ok', label: 'comfort band' }];
+    const c1 = CL.card(S.right, 'Your controls');
+    const tap = CL.slider(c1, { label: 'Tap: cold ← → hot', min: 0, max: 100, step: 1, value: 30, unit: '% hot', color: '--ctl' });
+    c1.append(el('div', { class: 'muted', style: 'font-size:.85rem' }, ['Keyboard: ', el('span', { class: 'kbd' }, '←'), ' colder, ', el('span', { class: 'kbd' }, '→'), ' hotter']));
+    const mode = CL.seg(c1, { label: 'Who controls the tap?', options: [['you', 'You'], ['pi', 'Controller (PI)']], value: 'you' });
+    const lag = CL.slider(c1, { label: 'Pipe delay', min: 0, max: 5, step: .5, value: 2, dec: 1, unit: 's', color: '--err' });
+    const bb = el('div', { class: 'btns' }); c1.append(bb);
+    CL.button(bb, '▶ Start 60-second round', () => reset(true), 'pri');
+    const c2 = CL.card(S.right, 'Score');
+    const T = CL.tiles(c2, [['time', 'Time left', '--sys'], ['in', 'In comfort band', '--ok'], ['best', 'Best (you)', '--ctl']]);
+    const ex = CL.card(S.right, 'Think about it', 'explain');
+    ex.innerHTML += '<p>Why do people overshoot when adjusting a shower? What would happen with a 5-second delay? What does the controller do differently from you?</p><p class="muted">Concept: closed-loop feedback, delay, overshoot and oscillation. In a real shower, the delay is the time water takes to travel through the pipe.</p>';
+    let st, best = 0, events = [];
+    function reset(run) { st = { t: 0, T: 30, q: [], inb: 0, run, I: 0, done: false }; ch.clear(); events = [[12 + Math.random() * 6, 'Someone flushed the toilet! (less cold water)', 9], [32 + Math.random() * 6, 'Boiler hiccup (water cooler)', -10], [48 + Math.random() * 5, 'Flush again!', 8]]; }
+    reset(false);
+    S.resetB.onclick = () => reset(false);
+    const kd = e => { if (e.key === 'ArrowLeft') tap.set(clamp(tap.get() - 3, 0, 100)); if (e.key === 'ArrowRight') tap.set(clamp(tap.get() + 3, 0, 100)); };
+    window.addEventListener('keydown', kd);
+    let dist = 0, msg = '', msgT = 0;
+    const dt = 0.02;
+    let acc = 0; const L = CL.loop((rdt, paused) => {
+      if (!paused) for (acc += rdt; acc >= dt; acc -= dt) {
+        if (st.run && !st.done) {
+          events.forEach(ev => { if (!ev.fired && st.t >= ev[0]) { ev.fired = true; dist += ev[2]; msg = ev[1]; msgT = 3; } });
+        }
+        dist *= (1 - dt / 8);
+        if (mode.get() === 'pi') { const e = 38.5 - st.T; st.I += e * dt; tap.set(clamp(30 + 2.2 * e + 0.6 * st.I, 0, 100)); }
+        const mix = 15 + tap.get() / 100 * 45 + dist;
+        st.q.push(mix); const nd = Math.round(lag.get() / dt); while (st.q.length > nd + 1) st.q.shift();
+        st.T += (st.q[0] - st.T) * dt / 0.6;
+        st.t += dt; msgT -= dt;
+        if (st.run && !st.done) { if (st.T >= 37 && st.T <= 40) st.inb += dt; if (st.t >= 60) { st.done = true; if (mode.get() === 'you') best = Math.max(best, st.inb / 60 * 100); } }
+      }
+      ch.push(st.t, [st.T, 20 + tap.get() * .35]); ch.draw(); draw();
+      T.set('time', st.run ? Math.max(0, 60 - st.t).toFixed(0) + ' s' : '—'); T.set('in', st.run ? (st.inb / Math.min(60, Math.max(st.t, .01)) * 100).toFixed(0) + ' %' : '—'); T.set('best', best.toFixed(0) + ' %');
+    }, S.pauseB);
+    function draw() {
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
+      const cx = w * .35, top = h * .12;
+      ctx.strokeStyle = css('--muted'); ctx.lineWidth = 10; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(cx - 160, h * .8); ctx.lineTo(cx - 160, top); ctx.lineTo(cx, top); ctx.lineTo(cx, top + 30); ctx.stroke();
+      // pipe colour segments (delay visual)
+      const n = st.q.length; for (let i = 0; i < 20; i++) { const v = st.q[Math.floor((1 - i / 20) * (n - 1))] ?? st.T; const f = clamp((v - 15) / 45, 0, 1); ctx.strokeStyle = `rgb(${Math.round(59 + 180 * f)},${Math.round(130 - 62 * f)},${Math.round(246 - 178 * f)})`; ctx.lineWidth = 6; const y0 = h * .8 - i * (h * .8 - top) / 20; ctx.beginPath(); ctx.moveTo(cx - 160, y0); ctx.lineTo(cx - 160, y0 - (h * .8 - top) / 20); ctx.stroke(); }
+      ctx.fillStyle = css('--muted'); ctx.fillRect(cx - 40, top + 30, 80, 14);
+      const f = clamp((st.T - 15) / 45, 0, 1); const col = `rgb(${Math.round(59 + 180 * f)},${Math.round(130 - 62 * f)},${Math.round(246 - 178 * f)})`;
+      for (let i = 0; i < 26; i++) { ctx.strokeStyle = CL.alpha('#ffffff', .0) ; ctx.fillStyle = col; const x = cx - 34 + (i % 13) * 5.5 + Math.sin(st.t * 9 + i) * 3, y = top + 50 + ((st.t * 260 + i * 37) % (h * .55)); ctx.fillRect(x, y, 2.5, 9); }
+      // person (simple)
+      const px = cx, py = h * .62; ctx.fillStyle = css('--panel'); ctx.strokeStyle = css('--ink'); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(px, py - 40, 22, 0, 7); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(px, py - 18); ctx.lineTo(px, py + 50); ctx.stroke();
+      const face = st.T > 40 ? '🥵' : st.T < 37 ? '🥶' : '😊'; ctx.font = '30px serif'; ctx.textAlign = 'center'; ctx.fillText(face, px, py - 30);
+      // tap knob
+      const kx = cx - 160, ky = h * .62; ctx.fillStyle = css('--panel2'); ctx.beginPath(); ctx.arc(kx, ky, 26, 0, 7); ctx.fill();
+      const a = -Math.PI * .75 + tap.get() / 100 * Math.PI * 1.5; CL.arrow(ctx, kx, ky, kx + 24 * Math.cos(a - Math.PI / 2), ky + 24 * Math.sin(a - Math.PI / 2), css('--ctl'), 4);
+      ctx.font = '600 12px Inter'; ctx.fillStyle = css('--sys'); ctx.fillText('cold', kx - 36, ky + 42); ctx.fillStyle = css('--err'); ctx.fillText('hot', kx + 36, ky + 42);
+      ctx.textAlign = 'left'; ctx.font = '700 34px "Space Grotesk",Inter'; ctx.fillStyle = st.T >= 37 && st.T <= 40 ? css('--ok') : css('--err'); ctx.fillText(st.T.toFixed(1) + ' °C', w * .62, h * .35);
+      ctx.font = '14px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText('target 37–40 °C', w * .62, h * .35 + 24);
+      if (msgT > 0) { ctx.fillStyle = css('--err'); ctx.font = '700 16px Inter'; ctx.fillText('⚠ ' + msg, w * .52, h * .65); }
+      if (st.done) { ctx.fillStyle = css('--ok'); ctx.font = '700 20px Inter'; ctx.fillText(`Round over: ${(st.inb / 60 * 100).toFixed(0)} % of the time comfortable`, w * .45, h * .85); }
+      else if (!st.run) { ctx.fillStyle = css('--ctl'); ctx.font = '600 15px Inter'; ctx.fillText('Practise freely, or press “Start 60-second round”.', w * .45, h * .85); }
+    }
+    return { stop: () => { L.stop(); window.removeEventListener('keydown', kd); } };
+  }
+};
+
+APPS['game-drone'] = {
+  title: 'Game: Hover the Drone', concept: 'Stability and disturbance rejection', audience: 'School (Class 8–12)', color: '--sys', game: true,
+  blurb: 'Hold the thrust button to fly a delivery drone through moving altitude gates while gusts push it around. Then switch on the autopilot.',
+  mount(root, back) {
+    const { css, clamp, el, randn } = CL;
+    const S = gameShell(root, back, { title: this.title, subtitle: 'Thrust fights gravity. Too little and you fall; too much and you overshoot.', color: this.color });
+    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/8;user-select:none' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots' }); S.left.append(pl);
+    const ch = new CL.Chart(pl, { title: 'Altitude', yUnit: 'm', window: 30, yMin: 0, yMax: 12, series: [{ name: 'Gate centre', color: '--ok', dash: [6, 4] }, { name: 'Drone', color: '--sys' }] });
+    const c1 = CL.card(S.right, 'Controls');
+    const thr = el('button', { class: 'b pri', style: 'width:100%;padding:18px;font-size:1.1rem;touch-action:none' }, '⬆ HOLD FOR THRUST  (or Space)'); c1.append(thr);
+    let hold = 0; thr.addEventListener('pointerdown', e => { e.preventDefault(); hold = 1; }); ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => thr.addEventListener(ev, () => hold = 0));
+    const kd = e => { if (e.code === 'Space') { hold = 1; e.preventDefault(); } }, ku = e => { if (e.code === 'Space') hold = 0; };
+    window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
+    const mode = CL.seg(c1, { label: 'Pilot', options: [['you', 'You'], ['pd', 'Autopilot (PD)'], ['pid', 'Autopilot (PID)']], value: 'you' });
+    const gust = CL.slider(c1, { label: 'Wind gusts', min: 0, max: 6, step: .5, value: 2, dec: 1, color: '--err' });
+    const pay = CL.slider(c1, { label: 'Parcel mass', min: 0, max: 1.5, step: .1, value: 0, dec: 1, unit: 'kg', color: '--err', hint: 'The autopilot was tuned for an empty drone.' });
+    const bb = el('div', { class: 'btns' }); c1.append(bb); CL.button(bb, '▶ Start 45-second round', () => reset(true), 'pri');
+    const c2 = CL.card(S.right, 'Score'); const T = CL.tiles(c2, [['t', 'Time left', '--sys'], ['in', 'Inside gates', '--ok'], ['best', 'Best (you)', '--ctl']]);
+    const ex = CL.card(S.right, 'Think about it', 'explain');
+    ex.innerHTML += '<p>Why does the PD autopilot hover slightly below the gate when carrying a parcel? Why does adding I (PID) fix it? Is the drone stable if nobody controls it?</p><p class="muted">Concept: unstable open-loop behaviour, feedback stabilisation, steady-state error and integral action.</p>';
+    let st, best = 0;
+    function target(t) { return 5 + 3 * Math.sin(t / 6) + 1.5 * Math.sin(t / 2.3 + 1); }
+    function reset(run) { st = { t: 0, z: 4, v: 0, run, inb: 0, done: false, I: 0, wind: 0, u: 0 }; ch.clear(); }
+    reset(false); S.resetB.onclick = () => reset(false);
+    const dt = 0.01, g = 9.81, m0 = 1.2, Tmax = 2.1 * m0 * g;
+    let acc = 0; const L = CL.loop((rdt, paused) => {
+      if (!paused) for (acc += rdt; acc >= dt; acc -= dt) {
+        const m = m0 + pay.get(), r = target(st.t);
+        let u;
+        if (mode.get() === 'you') u = hold;
+        else { const e = r - st.z; if (mode.get() === 'pid') st.I = clamp(st.I + e * dt, -10, 10); else st.I = 0; u = clamp((m0 * g + m0 * (6 * e - 4 * st.v + (mode.get() === 'pid' ? 4 * st.I : 0))) / Tmax, 0, 1); }
+        st.u += (u - st.u) * dt / 0.08;
+        st.wind += (gust.get() * randn() * 2.5 - st.wind) * dt / 0.6;
+        const a = (st.u * Tmax + st.wind) / m - g - 0.3 * st.v;
+        st.v += a * dt; st.z += st.v * dt; if (st.z < 0) { st.z = 0; st.v = Math.max(0, st.v); } if (st.z > 12) { st.z = 12; st.v = Math.min(0, st.v); }
+        st.t += dt;
+        if (st.run && !st.done) { if (Math.abs(st.z - r) < 0.8) st.inb += dt; if (st.t >= 45) { st.done = true; if (mode.get() === 'you') best = Math.max(best, st.inb / 45 * 100); } }
+      }
+      ch.push(st.t, [target(st.t), st.z]); ch.draw(); draw();
+      T.set('t', st.run ? Math.max(0, 45 - st.t).toFixed(0) + ' s' : '—'); T.set('in', st.run ? (st.inb / Math.min(45, Math.max(.01, st.t)) * 100).toFixed(0) + ' %' : '—'); T.set('best', best.toFixed(0) + ' %');
+    }, S.pauseB);
+    function draw() {
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
+      const Y = z => h - 20 - z / 12 * (h - 40), sx = 40; // px per second ahead
+      const x0 = w * .3;
+      ctx.fillStyle = CL.alpha(css('--muted'), .3); ctx.fillRect(0, h - 20, w, 20);
+      // gates ahead
+      for (let tt = Math.ceil(st.t) - 8; tt < st.t + (w - x0) / sx; tt += 2) {
+        const x = x0 + (tt - st.t) * sx, r = target(tt); ctx.strokeStyle = CL.alpha(css('--ok'), .7); ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(x, Y(r + .8)); ctx.lineTo(x, Y(r + .8) - 10); ctx.moveTo(x, Y(r - .8)); ctx.lineTo(x, Y(r - .8) + 10); ctx.stroke();
+        ctx.fillStyle = CL.alpha(css('--ok'), .12); ctx.fillRect(x - 3, Y(r + .8), 6, Y(r - .8) - Y(r + .8));
+      }
+      const zx = x0, zy = Y(st.z), inb = Math.abs(st.z - target(st.t)) < .8;
+      ctx.save(); ctx.translate(zx, zy); ctx.rotate(st.wind * 0.03);
+      ctx.fillStyle = inb ? css('--sys') : css('--err'); CL.rrect(ctx, -30, -8, 60, 16, 6); ctx.fill();
+      ctx.strokeStyle = css('--ink'); ctx.lineWidth = 3; [-38, 38].forEach(px => { ctx.beginPath(); ctx.moveTo(px - 16, -14); ctx.lineTo(px + 16, -14); ctx.stroke(); ctx.beginPath(); ctx.moveTo(px, -8); ctx.lineTo(px, -14); ctx.stroke(); });
+      if (pay.get() > 0) { ctx.fillStyle = '#b5835a'; ctx.fillRect(-12, 10, 24, 16 + pay.get() * 6); }
+      ctx.restore();
+      if (st.u > .05) CL.arrow(ctx, zx, zy - 20, zx, zy - 20 - st.u * 60, css('--ctl'), 4);
+      CL.arrow(ctx, zx + 50, zy, zx + 50, zy + 40, css('--err'), 3, ''); ctx.fillStyle = css('--err'); ctx.font = '11px Inter'; ctx.fillText('gravity', zx + 56, zy + 30);
+      if (Math.abs(st.wind) > 1) { CL.arrow(ctx, zx - 70, zy, zx - 70, zy - st.wind * 6, CL.alpha(css('--err'), .7), 3); }
+      ctx.font = '700 18px "Space Grotesk",Inter'; ctx.textAlign = 'left'; ctx.fillStyle = css('--ink'); ctx.fillText(`altitude ${st.z.toFixed(1)} m`, 14, 28);
+      if (st.done) { ctx.fillStyle = css('--ok'); ctx.font = '700 20px Inter'; ctx.fillText(`Round over: inside the gates ${(st.inb / 45 * 100).toFixed(0)} % of the time`, 14, 56); }
+    }
+    return { stop: () => { L.stop(); window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); } };
+  }
+};
+
+APPS['game-traffic'] = {
+  title: 'Game: The Traffic Controller', concept: 'Feedback vs fixed schedules', audience: 'School (Class 8–12)', color: '--err', game: true,
+  blurb: 'Run a busy junction. Switch the lights yourself, then compare a fixed timer with a feedback controller that counts the queues.',
+  mount(root, back) {
+    const { css, clamp, el } = CL;
+    const S = gameShell(root, back, { title: this.title, subtitle: 'Sensor = queue length, actuator = traffic light, objective = least total waiting time', color: this.color });
+    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/8' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots' }); S.left.append(pl);
+    const ch = new CL.Chart(pl, { title: 'Queue lengths', yUnit: 'cars', window: 120, minSpan: 6, yMin: 0, series: [{ name: 'North–South', color: '--sys' }, { name: 'East–West', color: '--ctl' }] });
+    const c1 = CL.card(S.right, 'Controls');
+    const swB = el('button', { class: 'b pri', style: 'width:100%;padding:16px;font-size:1.05rem' }, '🚦 SWITCH LIGHTS  (or Space)'); c1.append(swB);
+    const mode = CL.seg(c1, { label: 'Who runs the signal?', options: [['you', 'You'], ['timer', 'Fixed timer'], ['fb', 'Feedback']], value: 'you' });
+    const rNS = CL.slider(c1, { label: 'North–South traffic', min: 2, max: 30, step: 1, value: 18, unit: 'cars/min', color: '--sys' });
+    const rEW = CL.slider(c1, { label: 'East–West traffic', min: 2, max: 30, step: 1, value: 8, unit: 'cars/min', color: '--ctl' });
+    const green = CL.slider(c1, { label: 'Fixed timer: green time', min: 5, max: 40, step: 1, value: 20, unit: 's' });
+    const bb = el('div', { class: 'btns' }); c1.append(bb); CL.button(bb, '▶ Start 2-minute round', () => reset(true), 'pri'); CL.button(bb, '🚑 Rush hour on N–S', () => rNS.set(28), 'warn');
+    const c2 = CL.card(S.right, 'Score'); const T = CL.tiles(c2, [['t', 'Time left', '--sys'], ['thr', 'Cars through', '--ok'], ['wait', 'Avg. wait', '--err'], ['best', 'Best avg. wait (you)', '--ctl']]);
+    const ex = CL.card(S.right, 'Think about it', 'explain');
+    ex.innerHTML += '<p>Why does a fixed timer waste green time when one road is empty? What does the feedback controller measure? Why must there be a minimum green time and an amber phase (safety constraint)?</p><p class="muted">Concept: open-loop schedule vs closed-loop feedback; constraints; trading off two queues.</p>';
+    let st, best = Infinity;
+    function reset(run) { st = { t: 0, phase: 0, amber: 0, since: 0, q: [[], []], passed: 0, waitSum: 0, run, done: false, acc: [0, 0], next: 0 }; ch.clear(); }
+    reset(false); S.resetB.onclick = () => reset(false);
+    const sw = () => { if (st.amber > 0 || st.since < 3) return; st.amber = 3; };
+    swB.onclick = () => { if (mode.get() === 'you') sw(); };
+    const kd = e => { if (e.code === 'Space') { e.preventDefault(); if (mode.get() === 'you') sw(); } }; window.addEventListener('keydown', kd);
+    const dt = 0.05, SPEED = 2;
+    let acc = 0; const L = CL.loop((rdt, paused) => {
+      if (!paused) for (acc += rdt * SPEED; acc >= dt; acc -= dt) {
+        [rNS.get(), rEW.get()].forEach((r, k) => { if (Math.random() < r / 60 * dt) st.q[k].push(st.t); });
+        if (st.amber > 0) { st.amber -= dt; if (st.amber <= 0) { st.phase = 1 - st.phase; st.since = 0; } }
+        else {
+          st.since += dt;
+          const g = st.phase, o = 1 - g;
+          if (st.q[g].length) { st.next -= dt; if (st.next <= 0) { const t0 = st.q[g].shift(); st.next = 1.8; if (st.run && !st.done) { st.passed++; st.waitSum += st.t - t0; } } } else st.next = 0;
+          if (mode.get() === 'timer' && st.since >= green.get()) sw();
+          if (mode.get() === 'fb' && st.since >= 6 && (st.q[o].length > st.q[g].length + 3 || (st.q[g].length === 0 && st.q[o].length > 0))) sw();
+        }
+        st.t += dt;
+        if (st.run && !st.done && st.t >= 120) { st.done = true; const aw = avgWait(); if (mode.get() === 'you') best = Math.min(best, aw); }
+      }
+      ch.push(st.t, [st.q[0].length, st.q[1].length]); ch.draw(); draw();
+      T.set('t', st.run ? Math.max(0, 120 - st.t).toFixed(0) + ' s' : '—'); T.set('thr', st.passed); T.set('wait', st.run ? avgWait().toFixed(1) + ' s' : '—'); T.set('best', isFinite(best) ? best.toFixed(1) + ' s' : '—');
+    }, S.pauseB);
+    function avgWait() { // include cars still waiting
+      let s = st.waitSum, n = st.passed; st.q.forEach(q => q.forEach(t0 => { s += st.t - t0; n++; })); return n ? s / n : 0;
+    }
+    function draw() {
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
+      const cx = w / 2, cy = h / 2, rw = Math.min(w, h) * .18;
+      ctx.fillStyle = CL.alpha(css('--muted'), .35); ctx.fillRect(cx - rw / 2, 0, rw, h); ctx.fillRect(0, cy - rw / 2, w, rw);
+      ctx.strokeStyle = css('--ink'); ctx.globalAlpha = .4; ctx.setLineDash([10, 10]); ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, h); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      const carW = 16, gap = 22;
+      st.q[0].forEach((_, i) => { ctx.fillStyle = css('--sys'); CL.rrect(ctx, cx - rw / 4 - carW / 2, cy - rw / 2 - 10 - (i + 1) * gap, carW, 18, 4); ctx.fill(); });
+      st.q[1].forEach((_, i) => { ctx.fillStyle = css('--ctl'); CL.rrect(ctx, cx + rw / 2 + 10 + i * gap, cy - rw / 4 - carW / 2, 18, carW, 4); ctx.fill(); });
+      const light = (x, y, k) => { const on = st.amber > 0 ? (st.phase === k ? 'amber' : 'red') : st.phase === k ? 'green' : 'red'; ctx.fillStyle = '#222'; CL.rrect(ctx, x - 12, y - 32, 24, 64, 6); ctx.fill(); [['red', '#ff4d4d', -20], ['amber', '#ffb020', 0], ['green', '#2ecc71', 20]].forEach(([n, c, dy]) => { ctx.fillStyle = on === n ? c : '#444'; ctx.beginPath(); ctx.arc(x, y + dy, 8, 0, 7); ctx.fill(); }); };
+      light(cx - rw / 2 - 26, cy - rw / 2 - 40, 0); light(cx + rw / 2 + 40, cy - rw / 2 - 26, 1);
+      ctx.font = '600 13px Inter'; ctx.fillStyle = css('--sys'); ctx.textAlign = 'right'; ctx.fillText(`N–S queue: ${st.q[0].length}`, cx - rw / 2 - 50, 24);
+      ctx.fillStyle = css('--ctl'); ctx.textAlign = 'left'; ctx.fillText(`E–W queue: ${st.q[1].length}`, cx + rw / 2 + 60, cy + rw / 2 + 24);
+      ctx.fillStyle = css('--muted'); ctx.fillText(`time ×${SPEED}`, 12, h - 12);
+      if (st.done) { ctx.fillStyle = css('--ok'); ctx.font = '700 18px Inter'; ctx.fillText(`Round over: ${st.passed} cars, average wait ${avgWait().toFixed(1)} s`, 12, 26); }
+    }
+    return { stop: () => { L.stop(); window.removeEventListener('keydown', kd); } };
+  }
+};
+
+/* Hub: hash router for all demos */
+(function () {
+  CL.initTheme();
+  const root = document.getElementById('root');
+  const order = ['cruise', 'thermo', 'pendulum', 'robot', 'energy'], games = ['game-shower', 'game-drone', 'game-traffic'];
+  const mods = { cruise: 'Module 2', thermo: 'Module 5 · PID', pendulum: 'Module 3', robot: 'Module 5 · Safe autonomy', energy: 'Module 5 · MPC', 'game-shower': 'Module 1 · Part II', 'game-drone': 'Module 3 · Part II', 'game-traffic': 'Module 4 · Part II' };
+  let cur = null;
+  function hub() {
+    const { el } = CL; root.innerHTML = '';
+    const top = el('div', { class: 'cl-top' }, [el('div', {}, [el('h1', {}, 'Control Lab'), el('div', { class: 'sub' }, 'Interactive companion to the lecture “The Science of Control: From Everyday Life to Intelligent Autonomous Systems”')]), el('div', { class: 'spacer' })]);
+    const th = el('button', { class: 'b' }, '◐ Light / dark'); th.onclick = () => CL.setTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light'); top.append(th);
+    const h = el('div', { class: 'hub' });
+    h.append(el('h1', {}, 'Observe. Decide. Act. Repeat.'));
+    h.append(el('p', { class: 'lead' }, 'Every simulation below runs entirely in your browser — no installation, no MATLAB. Move the sliders, break things, and see why feedback, stability and safety matter. Each demo has a guided experiment on the right.'));
+    const key = el('div', { class: 'colorkey' }); [['--sys', 'System / physics'], ['--ctl', 'Control action'], ['--ok', 'Desired / safe'], ['--err', 'Error / disturbance / unsafe'], ['--ai', 'Intelligence / prediction / learning']].forEach(([c, t]) => key.append(el('span', { style: `--c:var(${c})` }, t))); h.append(key);
+    const sec = (title, ids) => {
+      h.append(el('div', { class: 'sect' }, title)); const g = el('div', { class: 'grid-cards' });
+      ids.forEach((id, i) => { const a = APPS[id]; g.append(el('a', { class: 'dcard', href: '#' + id, style: `--c:var(${a.color})` }, [el('div', { class: 'muted', style: 'font-size:.8rem' }, (a.game ? 'Mini-game' : 'Dashboard ' + (i + 1)) + ' · ' + mods[id]), el('h2', {}, a.title.replace('Game: ', '')), el('p', {}, a.blurb), el('div', { class: 'meta' }, [el('span', { class: 'tag', style: `color:var(${a.color})` }, a.concept), el('span', { class: 'tag', style: 'color:var(--muted)' }, a.audience)])])); });
+      h.append(g);
+    };
+    sec('Dashboards', order); sec('Mini-games for school students', games);
+    h.append(el('p', { class: 'muted', style: 'margin-top:28px;font-size:.85rem' }, 'Tips for presenters: use the ◐ button for bright projectors; every dashboard has Pause and Reset; keyboard arrows work in the pendulum and shower game, Space in the drone and traffic games. Each demo also works offline as a single HTML file.'));
+    root.append(top, h);
+  }
+  function route() {
+    if (cur && cur.stop) cur.stop(); cur = null;
+    const id = location.hash.replace('#', '');
+    window.scrollTo(0, 0);
+    if (APPS[id]) cur = APPS[id].mount(root, true); else hub();
+  }
+  window.addEventListener('hashchange', route); route();
+})();
+</script>
+<script>/* link back to the main website */
+(function () {
+  var a = document.createElement('a');
+  a.href = '../index.html'; a.textContent = '← Bhabani Shankar Dey';
+  a.style.cssText = 'display:inline-block;margin-bottom:3px;font:600 12px/1.2 Inter,system-ui,sans-serif;letter-spacing:.02em;color:var(--muted);text-decoration:none';
+  var h1 = document.querySelector('.cl-top h1');
+  if (h1) { h1.parentNode.insertBefore(a, h1); a.insertAdjacentHTML('afterend', '<br>'); }
+  else { a.style.cssText += ';position:fixed;left:12px;bottom:12px;z-index:50;padding:6px 10px;border:1px solid var(--line);border-radius:99px;background:var(--panel)'; document.body.appendChild(a); }
+})();
+</script>
+</body></html>

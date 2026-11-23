@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Control Lab – thermo</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"><style>:root{
+  --bg:#0b1020;--panel:#121a30;--panel2:#18223d;--ink:#e8edf7;--muted:#9aa7c2;--line:#26324f;--grid:#1d2742;
+  --sys:#4da3ff;--ctl:#ff9f43;--ok:#2ecc71;--err:#ff5d5d;--ai:#b48cff;--warn:#ffd166;
+  --radius:14px;font-size:16px;color-scheme:dark;
+}
+[data-theme=light]{
+  --bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2f8;--ink:#14203a;--muted:#55627f;--line:#d6dcea;--grid:#e6ebf4;
+  --sys:#1c6dd0;--ctl:#e07800;--ok:#14984a;--err:#d63031;--ai:#7a4ed6;--warn:#b7791f;color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
+h1,h2,h3{font-family:"Space Grotesk","Inter",system-ui,sans-serif;letter-spacing:-.01em;margin:0}
+a{color:var(--sys)}
+.cl-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+.cl-top h1{font-size:1.35rem}
+.cl-top .sub{color:var(--muted);font-size:.92rem}
+.cl-top .spacer{flex:1}
+.tag{display:inline-block;font-size:.75rem;font-weight:600;padding:3px 9px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.cl-app{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:14px;padding:14px;max-width:1500px;margin:0 auto}
+@media (max-width:980px){.cl-app{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.card h3{font-size:.95rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;font-weight:600}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.visual{position:relative;width:100%;aspect-ratio:16/7;border-radius:10px;overflow:hidden;background:var(--panel2)}
+.visual canvas{width:100%;height:100%;display:block;touch-action:none}
+.plots{display:grid;grid-template-columns:1fr;gap:10px}
+.plots.two{grid-template-columns:1fr 1fr}
+@media (max-width:700px){.plots.two{grid-template-columns:1fr}}
+.chart{position:relative;width:100%;height:150px}
+.chart canvas{width:100%;height:100%;display:block}
+.ctl-row{margin:8px 0 12px}
+.ctl-row label{display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:3px}
+.ctl-row label b{font-variant-numeric:tabular-nums;font-weight:600}
+input[type=range]{width:100%;accent-color:var(--ctl);height:22px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button.b{font:inherit;font-size:.88rem;font-weight:600;padding:7px 12px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);cursor:pointer}
+button.b:hover{border-color:var(--muted)}
+button.b.pri{background:var(--sys);border-color:var(--sys);color:#fff}
+button.b.warn{border-color:var(--err);color:var(--err)}
+button.b.on{outline:2px solid var(--ctl);outline-offset:1px}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:4px 0 10px}
+.seg button{flex:1;font:inherit;font-size:.85rem;padding:7px 6px;background:var(--panel2);color:var(--muted);border:0;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--sys);color:#fff;font-weight:600}
+.chk{display:flex;align-items:center;gap:8px;font-size:.9rem;margin:6px 0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.tile{background:var(--panel2);border-radius:10px;padding:8px 10px}
+.tile .k{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.tile .v{font-size:1.35rem;font-weight:700;font-variant-numeric:tabular-nums;font-family:"Space Grotesk",system-ui}
+.explain{font-size:.95rem}
+.explain p{margin:.3em 0}
+.guide .step{font-size:.93rem}
+.guide .n{color:var(--muted);font-size:.8rem}
+.guide .nav{display:flex;gap:8px;margin-top:8px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:.8rem;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-2px}
+.badge{font-weight:700;padding:4px 10px;border-radius:8px;font-size:.9rem}
+.kbd{font-family:ui-monospace,monospace;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:.85em}
+.muted{color:var(--muted)}
+.eq{font-family:"Cambria Math","STIX Two Math",Georgia,serif;font-size:1.05rem;background:var(--panel2);padding:6px 10px;border-radius:8px;display:inline-block}
+/* hub */
+.hub{max-width:1200px;margin:0 auto;padding:26px 18px 60px}
+.hub h1{font-size:2.2rem}
+.hub .lead{color:var(--muted);font-size:1.05rem;max-width:760px}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;margin-top:18px}
+.dcard{display:block;text-decoration:none;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--c);border-radius:var(--radius);padding:14px 16px;transition:transform .12s}
+.dcard:hover{transform:translateY(-2px);border-color:var(--c)}
+.dcard h2{font-size:1.15rem;margin:4px 0 6px}
+.dcard p{margin:0;color:var(--muted);font-size:.92rem}
+.dcard .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.sect{margin-top:30px;font-size:.85rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.colorkey{display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;font-size:.9rem}
+.colorkey span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--c);margin-right:6px;vertical-align:-1px}
+.overlay-msg{position:absolute;inset:auto 0 12px 0;text-align:center;pointer-events:none}
+.overlay-msg span{background:rgba(0,0,0,.6);color:#fff;padding:6px 14px;border-radius:99px;font-weight:600}
+</style></head>
+<body><div id="root"></div>
+<script>/* Control Lab — shared helpers (no external libraries) */
+window.APPS = window.APPS || {};
+const CL = (() => {
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const el = (tag, attrs = {}, kids = []) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (k === 'class') e.className = v;
+      else if (k === 'html') e.innerHTML = v;
+      else if (k === 'style') e.style.cssText = v;
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+      else e.setAttribute(k, v);
+    }
+    (Array.isArray(kids) ? kids : [kids]).forEach(c => c != null && e.append(c.nodeType ? c : document.createTextNode(c)));
+    return e;
+  };
+  let gaussSpare = null;
+  const randn = () => {
+    if (gaussSpare !== null) { const s = gaussSpare; gaussSpare = null; return s; }
+    let u = 0, v = 0; while (u === 0) u = Math.random(); v = Math.random();
+    const r = Math.sqrt(-2 * Math.log(u)); gaussSpare = r * Math.sin(2 * Math.PI * v); return r * Math.cos(2 * Math.PI * v);
+  };
+
+  function setTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    try { localStorage.setItem('cl-theme', t); } catch (e) {}
+  }
+  function initTheme() {
+    let t = 'dark'; try { t = localStorage.getItem('cl-theme') || 'dark'; } catch (e) {}
+    setTheme(t);
+  }
+
+  /* Page shell for one dashboard */
+  function shell(root, o) {
+    root.innerHTML = '';
+    const top = el('div', { class: 'cl-top' });
+    if (o.back) top.append(el('a', { href: '#', class: 'b', style: 'text-decoration:none;font-weight:600' }, '← All demos'));
+    top.append(el('div', {}, [el('h1', {}, o.title), el('div', { class: 'sub' }, o.subtitle || '')]));
+    top.append(el('div', { class: 'spacer' }));
+    if (o.tag) top.append(el('span', { class: 'tag', style: `color:var(${o.color || '--sys'})` }, o.tag));
+    if (o.audience) top.append(el('span', { class: 'tag', style: 'color:var(--muted)' }, o.audience));
+    const pauseB = el('button', { class: 'b' }, 'Pause');
+    const resetB = el('button', { class: 'b warn' }, 'Reset');
+    const themeB = el('button', { class: 'b', title: 'Light/dark (use light on bright projectors)' }, '◐');
+    themeB.onclick = () => setTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+    top.append(pauseB, resetB, themeB);
+    const app = el('div', { class: 'cl-app' });
+    const left = el('div', { class: 'col' }), right = el('div', { class: 'col' });
+    app.append(left, right);
+    root.append(top, app);
+    return { top, left, right, pauseB, resetB };
+  }
+
+  function card(parent, title, cls) {
+    const c = el('div', { class: 'card ' + (cls || '') });
+    if (title) c.append(el('h3', {}, title));
+    parent.append(c); return c;
+  }
+
+  function slider(parent, o) {
+    const fmt = o.fmt || (v => (+v).toFixed(o.dec ?? 0));
+    const val = el('b', {}, fmt(o.value) + (o.unit ? ' ' + o.unit : ''));
+    const inp = el('input', { type: 'range', min: o.min, max: o.max, step: o.step || 1, value: o.value });
+    if (o.color) inp.style.accentColor = `var(${o.color})`;
+    const row = el('div', { class: 'ctl-row' }, [el('label', {}, [el('span', {}, o.label), val]), inp]);
+    if (o.hint) row.append(el('div', { class: 'muted', style: 'font-size:.78rem' }, o.hint));
+    parent.append(row);
+    const upd = () => { val.textContent = fmt(inp.value) + (o.unit ? ' ' + o.unit : ''); o.onInput && o.onInput(+inp.value); };
+    inp.addEventListener('input', upd);
+    return { get: () => +inp.value, set: v => { inp.value = v; upd(); }, el: row, input: inp };
+  }
+
+  function seg(parent, o) {
+    const wrap = el('div', {});
+    if (o.label) wrap.append(el('div', { style: 'font-size:.9rem' }, o.label));
+    const s = el('div', { class: 'seg' }); wrap.append(s);
+    let cur = o.value; const bs = {};
+    o.options.forEach(([v, lab]) => {
+      const b = el('button', {}, lab); bs[v] = b;
+      b.onclick = () => { set(v); };
+      s.append(b);
+    });
+    function set(v, silent) { cur = v; Object.entries(bs).forEach(([k, b]) => b.classList.toggle('on', k == v)); if (!silent) o.onChange && o.onChange(v); }
+    set(cur, true); parent.append(wrap);
+    return { get: () => cur, set };
+  }
+
+  function check(parent, label, value, onChange) {
+    const i = el('input', { type: 'checkbox' }); i.checked = !!value;
+    i.onchange = () => onChange && onChange(i.checked);
+    const l = el('label', { class: 'chk' }, [i, label]); parent.append(l);
+    return { get: () => i.checked, set: v => { i.checked = v; onChange && onChange(v); } };
+  }
+
+  function button(parent, label, onClick, cls) {
+    const b = el('button', { class: 'b ' + (cls || '') }, label); b.onclick = onClick; parent.append(b); return b;
+  }
+
+  function tiles(parent, defs) {
+    const t = el('div', { class: 'tiles' }); const out = {};
+    defs.forEach(([key, label, color]) => {
+      const v = el('div', { class: 'v', style: color ? `color:var(${color})` : '' }, '–');
+      t.append(el('div', { class: 'tile' }, [el('div', { class: 'k' }, label), v])); out[key] = v;
+    });
+    parent.append(t);
+    return { set: (k, s) => { out[k].textContent = s; }, color: (k, c) => { out[k].style.color = `var(${c})`; } };
+  }
+
+  function guide(parent, steps, onStep) {
+    const c = card(parent, 'Guided experiment', 'guide');
+    const n = el('div', { class: 'n' }), h = el('div', { style: 'font-weight:700;margin:2px 0 4px' }), t = el('div', { class: 'step' });
+    const nav = el('div', { class: 'nav' });
+    let i = 0;
+    const prev = button(nav, '‹ Back', () => go(i - 1));
+    const doB = button(nav, 'Set it up for me', () => steps[i].setup && steps[i].setup(), 'pri');
+    const next = button(nav, 'Next ›', () => go(i + 1));
+    c.append(n, h, t, nav);
+    function go(k) {
+      i = clamp(k, 0, steps.length - 1);
+      n.textContent = `Step ${i + 1} of ${steps.length}`; h.textContent = steps[i].title; t.innerHTML = steps[i].text;
+      doB.style.display = steps[i].setup ? '' : 'none';
+      prev.disabled = i === 0; next.disabled = i === steps.length - 1;
+      onStep && onStep(i);
+    }
+    go(0); return { go };
+  }
+
+  /* Canvas sized to its box, with devicePixelRatio */
+  function canvasIn(container) {
+    const cv = el('canvas'); container.append(cv);
+    const ctx = cv.getContext('2d');
+    const st = { cv, ctx, w: 1, h: 1 };
+    const fit = () => {
+      const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+      st.w = Math.max(1, r.width); st.h = Math.max(1, r.height);
+      cv.width = Math.round(st.w * d); cv.height = Math.round(st.h * d); ctx.setTransform(d, 0, 0, d, 0, 0);
+    };
+    fit();
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(cv); else window.addEventListener('resize', fit);
+    st.fit = fit; return st;
+  }
+
+  /* Time-series / XY chart */
+  class Chart {
+    constructor(parent, o) {
+      this.o = Object.assign({ window: 30, height: 150, yMin: null, yMax: null, minSpan: 1, xLabel: 't (s)' }, o);
+      const box = el('div', { class: 'chart', style: `height:${this.o.height}px` }); parent.append(box);
+      this.c = canvasIn(box); this.clear();
+    }
+    clear() { this.t = []; this.d = this.o.series.map(() => []); this.xs = null; this.extra = []; }
+    push(t, vals) {
+      this.t.push(t); vals.forEach((v, i) => this.d[i].push(v));
+      if (this.t.length > 6000) { this.t.splice(0, 2000); this.d.forEach(a => a.splice(0, 2000)); }
+    }
+    setData(xs, ys) { this.t = xs; this.d = ys; }
+    draw(xRange) {
+      const { ctx, w, h } = this.c, o = this.o;
+      ctx.clearRect(0, 0, w, h);
+      const L = 46, R = 10, T = 22, B = 20, pw = w - L - R, ph = h - T - B;
+      const n = this.t.length;
+      let x1 = xRange ? xRange[1] : (n ? this.t[n - 1] : 0), x0 = xRange ? xRange[0] : Math.max(0, x1 - o.window);
+      if (!xRange && x1 < o.window) { x0 = 0; x1 = o.window; }
+      let i0 = 0; while (i0 < n && this.t[i0] < x0) i0++;
+      let lo = Infinity, hi = -Infinity;
+      this.d.forEach((a, si) => { if (o.series[si].noscale) return; for (let i = i0; i < n; i++) { const v = a[i]; if (v == null || !isFinite(v)) continue; if (v < lo) lo = v; if (v > hi) hi = v; } });
+      (this.extra || []).forEach(e => { if (e.y != null) { lo = Math.min(lo, e.y); hi = Math.max(hi, e.y); } });
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      if (o.yMin != null) lo = o.yMin; if (o.yMax != null) hi = o.yMax;
+      if (hi - lo < o.minSpan) { const m = (hi + lo) / 2; lo = m - o.minSpan / 2; hi = m + o.minSpan / 2; }
+      if (o.yMin == null || o.yMax == null) { const p = (hi - lo) * 0.08; if (o.yMin == null) lo -= p; if (o.yMax == null) hi += p; }
+      const X = x => L + (x - x0) / (x1 - x0 || 1) * pw, Y = y => T + (1 - (y - lo) / (hi - lo)) * ph;
+      this.X = X; this.Y = Y;
+      ctx.font = '11px Inter,system-ui,sans-serif'; ctx.fillStyle = css('--muted'); ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1;
+      const step = niceStep((hi - lo) / 4);
+      for (let y = Math.ceil(lo / step) * step; y <= hi + 1e-9; y += step) {
+        ctx.beginPath(); ctx.moveTo(L, Y(y)); ctx.lineTo(L + pw, Y(y)); ctx.stroke();
+        ctx.textAlign = 'right'; ctx.fillText(fmtNum(y, step), L - 5, Y(y) + 4);
+      }
+      const xs = niceStep((x1 - x0) / 6);
+      ctx.textAlign = 'center';
+      for (let x = Math.ceil(x0 / xs) * xs; x <= x1 + 1e-9; x += xs) ctx.fillText(o.xFmt ? o.xFmt(x) : fmtNum(x, xs), X(x), h - 5);
+      if (o.zero && lo < 0 && hi > 0) { ctx.strokeStyle = css('--muted'); ctx.globalAlpha = .5; ctx.beginPath(); ctx.moveTo(L, Y(0)); ctx.lineTo(L + pw, Y(0)); ctx.stroke(); ctx.globalAlpha = 1; }
+      (this.extra || []).forEach(e => { // horizontal reference lines
+        ctx.save(); ctx.strokeStyle = css(e.color); ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(L, Y(e.y)); ctx.lineTo(L + pw, Y(e.y)); ctx.stroke();
+        ctx.fillStyle = css(e.color); ctx.textAlign = 'left'; ctx.fillText(e.label || '', L + 4, Y(e.y) - 4); ctx.restore();
+      });
+      ctx.save(); ctx.beginPath(); ctx.rect(L, T - 2, pw, ph + 4); ctx.clip();
+      o.series.forEach((s, si) => {
+        const a = this.d[si]; ctx.strokeStyle = css(s.color); ctx.lineWidth = s.width || 2; ctx.setLineDash(s.dash || []);
+        ctx.globalAlpha = s.alpha || 1;
+        if (s.bars) {
+          ctx.fillStyle = css(s.color); const bw = pw / Math.max(1, (x1 - x0)) * (s.bars);
+          for (let i = i0; i < n; i++) { const v = a[i]; if (v == null) continue; ctx.fillRect(X(this.t[i]) - bw / 2, Math.min(Y(0), Y(v)), bw, Math.abs(Y(v) - Y(0))); }
+        } else {
+          ctx.beginPath(); let pen = false; const stride = Math.max(1, Math.floor((n - i0) / (pw * 1.5)));
+          for (let i = i0; i < n; i += stride) { const v = a[i]; if (v == null || !isFinite(v)) { pen = false; continue; } const px = X(this.t[i]), py = Y(v); if (!pen) { ctx.moveTo(px, py); pen = true; } else ctx.lineTo(px, py); }
+          if (s.step) { /* ok */ }
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      });
+      ctx.restore(); ctx.setLineDash([]);
+      if (this.vline != null) { ctx.strokeStyle = css('--ink'); ctx.globalAlpha = .5; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(this.vline), T); ctx.lineTo(X(this.vline), T + ph); ctx.stroke(); ctx.globalAlpha = 1; }
+      // title + legend
+      ctx.textAlign = 'left'; ctx.font = '600 12px Inter,system-ui,sans-serif'; ctx.fillStyle = css('--ink');
+      ctx.fillText(o.title || '', L, 14);
+      let lx = L + ctx.measureText(o.title || '').width + 14; ctx.font = '11px Inter,system-ui,sans-serif';
+      o.series.forEach((s, si) => {
+        if (s.nolegend) return;
+        const last = this.d[si][n - 1];
+        const txt = s.name + (last != null && isFinite(last) && !xRange ? ' ' + last.toFixed(s.dec ?? 1) : '');
+        ctx.strokeStyle = css(s.color); ctx.lineWidth = 2.5; ctx.setLineDash(s.dash || []); ctx.beginPath(); ctx.moveTo(lx, 10); ctx.lineTo(lx + 14, 10); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = css('--muted'); ctx.fillText(txt, lx + 18, 14); lx += 26 + ctx.measureText(txt).width;
+      });
+      if (o.yUnit && lx < w - 40) { ctx.fillStyle = css('--muted'); ctx.textAlign = 'right'; ctx.fillText(o.yUnit, w - R, 14); }
+    }
+  }
+  function niceStep(r) { if (!(r > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(r))), f = r / p; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p; }
+  function fmtNum(v, step) { const d = step >= 1 ? 0 : Math.min(3, Math.ceil(-Math.log10(step))); return (Math.abs(v) < 1e-9 ? 0 : v).toFixed(d); }
+
+  /* Animation loop with pause; step(dtReal) */
+  function loop(step, pauseB) {
+    let last = performance.now(), alive = true, paused = false;
+    if (pauseB) pauseB.onclick = () => { paused = !paused; pauseB.textContent = paused ? 'Resume' : 'Pause'; pauseB.classList.toggle('pri', paused); };
+    let nerr = 0;
+    function f(now) { if (!alive) return; requestAnimationFrame(f); const dt = Math.min(0.05, (now - last) / 1000); last = now; try { step(paused ? 0 : dt, paused); } catch (e) { if (nerr++ < 3) console.error(e); } }
+    requestAnimationFrame(f);
+    return { stop: () => { alive = false; }, isPaused: () => paused, setPaused: p => { if (p !== paused) pauseB ? pauseB.onclick() : (paused = p); } };
+  }
+
+  function arrow(ctx, x0, y0, x1, y1, color, w = 3, label) {
+    const a = Math.atan2(y1 - y0, x1 - x0), L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    ctx.save(); ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - Math.cos(a) * 8, y1 - Math.sin(a) * 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - 12 * Math.cos(a - .45), y1 - 12 * Math.sin(a - .45)); ctx.lineTo(x1 - 12 * Math.cos(a + .45), y1 - 12 * Math.sin(a + .45)); ctx.closePath(); ctx.fill();
+    if (label) { ctx.font = '600 12px Inter,system-ui'; ctx.textAlign = 'center'; ctx.fillText(label, (x0 + x1) / 2, (y0 + y1) / 2 - 8); }
+    ctx.restore();
+  }
+  function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function alpha(hex, a) { // css color '#rrggbb' -> rgba
+    hex = hex.replace('#', ''); if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    const n = parseInt(hex, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
+  }
+
+  return { css, clamp, el, randn, shell, card, slider, seg, check, button, tiles, guide, canvasIn, Chart, loop, arrow, rrect, alpha, initTheme, setTheme };
+})();
+</script>
+<script>APPS.thermo = {
+  title: 'Temperature Control Lab: P, I and D', concept: 'PID control', audience: 'School / UG', color: '--ctl',
+  blurb: 'Heat or cool a water bath with a delayed, noisy sensor. Compare an on–off thermostat with P, PI and PID, and watch the three terms work.',
+  mount(root, back) {
+    const { css, clamp, el, randn } = CL;
+    const S = CL.shell(root, { back, title: this.title, subtitle: 'u(t) = Kp·e(t) + Ki·∫e dt + Kd·de/dt   — present, past and future of the error', tag: this.concept, audience: this.audience, color: this.color });
+    const K = 50, TAU = 60, SPEED = 6; // °C gain at full power, time constant (s), playback speed
+    let st;
+    const reset = () => {
+      st = { t: 0, T: amb.get(), I: 0, buf: [], dF: 0, prevY: amb.get(), u: 0, up: 0, ui: 0, ud: 0, onoff: 0, spT: 0, spV: sp.get(), peak: -1e9, settle: null, iae: 0, energy: 0, start: amb.get() };
+      charts.forEach(c => c.clear());
+    };
+    const vis = el('div', { class: 'visual' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots' }); S.left.append(pl);
+    const cT = new CL.Chart(pl, { title: 'Temperature', yUnit: '°C', window: 300, minSpan: 6, series: [{ name: 'Setpoint', color: '--ok', dash: [6, 4] }, { name: 'Measured', color: '--sys', width: 1.2, alpha: .55 }, { name: 'True', color: '--sys' }] });
+    const cU = new CL.Chart(pl, { title: 'Control effort (heater + / cooler −)', yUnit: '%', window: 300, yMin: -110, yMax: 110, zero: true, height: 140, series: [{ name: 'Total (after limits)', color: '--ctl', width: 2.5 }, { name: 'P', color: '--sys', width: 1.3 }, { name: 'I', color: '--ai', width: 1.3 }, { name: 'D', color: '--ok', width: 1.3 }] });
+    const charts = [cT, cU];
+    const tl = CL.card(S.right, 'Performance since last setpoint change');
+    const T = CL.tiles(tl, [['os', 'Overshoot', '--err'], ['ts', 'Settling time', '--sys'], ['ss', 'Error now', '--err'], ['en', 'Energy used', '--ctl']]);
+
+    const mc = CL.card(S.right, 'Controller');
+    const mode = CL.seg(mc, { options: [['onoff', 'On–Off'], ['pid', 'PID']], value: 'pid' });
+    const kp = CL.slider(mc, { label: 'Kp  (present)', min: 0, max: 80, step: 1, value: 15, unit: '%/°C', color: '--sys' });
+    const ki = CL.slider(mc, { label: 'Ki  (past)', min: 0, max: 5, step: .05, value: 0, dec: 2, unit: '%/(°C·s)', color: '--ai' });
+    const kd = CL.slider(mc, { label: 'Kd  (future)', min: 0, max: 80, step: 1, value: 0, unit: '%·s/°C', color: '--ok' });
+    const hyst = CL.slider(mc, { label: 'On–Off band', min: 0.2, max: 4, step: .1, value: 1, dec: 1, unit: '°C' });
+    const aw = CL.check(mc, 'Anti-windup (stop integrating when the heater is maxed out)', true);
+    const pr = el('div', { class: 'btns' }); mc.append(el('div', { class: 'muted', style: 'font-size:.8rem;margin:2px 0 4px' }, 'Presets'), pr);
+    const preset = (m, p, i, d) => () => { mode.set(m); kp.set(p); ki.set(i); kd.set(d); };
+    CL.button(pr, 'On–Off', preset('onoff', 15, 0, 0)); CL.button(pr, 'P only', preset('pid', 15, 0, 0)); CL.button(pr, 'PI', preset('pid', 15, .47, 0));
+    CL.button(pr, 'PID', preset('pid', 20, .6, 30)); CL.button(pr, 'Too aggressive', preset('pid', 60, 4, 0), 'warn');
+
+    const pc = CL.card(S.right, 'The water bath');
+    const sp = CL.slider(pc, { label: 'Setpoint', min: 10, max: 70, step: 1, value: 50, unit: '°C', color: '--ok', onInput: v => { if (st) { st.spT = st.t; st.spV = v; st.peak = -1e9; st.settle = null; st.iae = 0; st.energy = 0; st.start = st.T; } } });
+    const amb = CL.slider(pc, { label: 'Room (ambient) temperature', min: 5, max: 40, step: 1, value: 25, unit: '°C', color: '--err' });
+    const delay = CL.slider(pc, { label: 'Sensor/transport delay', min: 0, max: 15, step: .5, value: 4, dec: 1, unit: 's', color: '--err' });
+    const noise = CL.slider(pc, { label: 'Sensor noise', min: 0, max: 1.5, step: .05, value: .15, dec: 2, unit: '°C', color: '--err' });
+    const bt = el('div', { class: 'btns' }); pc.append(bt);
+    CL.button(bt, '🧊 Pour in cold water', () => { st.T -= 12; }, 'warn');
+    const win = CL.check(pc, 'Window open (extra heat loss)', false);
+
+    const ex = CL.card(S.right, 'What you are seeing', 'explain'); const exT = el('div'); ex.append(exT);
+    CL.guide(S.right, [
+      { title: 'The thermostat way', text: 'A household thermostat is <b>on–off</b>: full power below the band, off above. Watch the temperature zig-zag. The delay makes it overshoot the band every time.', setup: () => { preset('onoff', 15, 0, 0)(); reset(); } },
+      { title: 'Proportional: push harder when farther away', text: 'Switch to <b>P only</b>. The response is smooth but settles <i>below</i> 50 °C. Heat leaks out all the time, and P only produces power when there is an error, so some error must remain.', setup: () => { preset('pid', 15, 0, 0)(); reset(); } },
+      { title: 'Integral: remember the past', text: 'Choose <b>PI</b>. The purple I-term slowly grows while the error persists, until the error is gone. Look at the effort plot: at steady state the I-term supplies almost all the power.', setup: () => { preset('pid', 15, .47, 0)(); reset(); } },
+      { title: 'Disturbance rejection', text: 'Press <b>Pour in cold water</b> and open the window. Watch the I-term increase to compensate for the new heat loss. The setpoint is recovered without anyone retuning anything.' },
+      { title: 'Derivative: anticipate', text: 'Choose <b>PID</b> and change the setpoint. The green D-term opposes fast changes and acts like a brake as you approach the target. Now raise the sensor noise and see why engineers filter or limit D.', setup: () => { preset('pid', 20, .6, 30)(); } },
+      { title: 'Windup', text: 'Choose PI, untick <b>anti-windup</b>, set the setpoint to 10 °C, wait, then set it to 60 °C. While the cooler or heater is saturated, the integral keeps growing, so the temperature overshoots badly. Tick anti-windup and repeat.', setup: () => { preset('pid', 15, .47, 0)(); aw.set(false); } },
+      { title: 'Too aggressive = unstable', text: 'Choose <b>Too aggressive</b>, then increase the delay. The loop starts to oscillate and never settles. High gain plus delay erodes stability: this is why tuning is a science.', setup: () => { preset('pid', 60, 4, 0)(); delay.set(6); } },
+    ]);
+    S.resetB.onclick = reset; reset();
+
+    const dt = 0.05;
+    function step() {
+      const Ta = amb.get() - (win.get() ? 15 : 0), loss = win.get() ? 1.6 : 1;
+      const yTrue = st.T, y = yTrue + noise.get() * randn();
+      const e = sp.get() - y;
+      let u;
+      if (mode.get() === 'onoff') {
+        if (e > hyst.get() / 2) st.onoff = 1; else if (e < -hyst.get() / 2) st.onoff = sp.get() < Ta ? -1 : 0;
+        if (sp.get() < Ta - 1 && e < -hyst.get() / 2) st.onoff = -1;
+        u = st.onoff; st.up = u; st.ui = 0; st.ud = 0;
+      } else {
+        const dy = (y - st.prevY) / dt; st.prevY = y; st.dF += (-dy - st.dF) * dt / 1.0; // filtered derivative on measurement
+        st.up = kp.get() / 100 * e; st.ud = kd.get() / 100 * st.dF;
+        const Inew = st.I + e * dt; let ui = ki.get() / 100 * Inew;
+        u = st.up + ui + st.ud; const us = clamp(u, -1, 1);
+        if (!aw.get() || us === u || Math.sign(e) !== Math.sign(u)) st.I = Inew;
+        st.ui = ki.get() / 100 * st.I; u = us;
+      }
+      st.u = clamp(u, -1, 1);
+      st.buf.push(st.u); const nd = Math.round(delay.get() / dt); while (st.buf.length > nd + 1) st.buf.shift();
+      const ud = st.buf.length > nd ? st.buf[0] : 0;
+      st.T += dt * (K * ud - loss * (st.T - Ta)) / TAU;
+      st.t += dt; st.y = y;
+      // metrics
+      const dir = Math.sign(st.spV - (st.start ?? st.T)) || 1;
+      st.peak = Math.max(st.peak, dir * (st.T - st.spV));
+      if (Math.abs(st.T - st.spV) > 0.5) st.settle = null; else if (st.settle == null) st.settle = st.t - st.spT;
+      st.iae += Math.abs(e) * dt; st.energy += Math.abs(ud) * 2 * dt / 3600; // 2 kW heater → kWh
+    }
+    let acc = 0, pushT = -1;
+    const L = CL.loop((rdt, paused) => {
+      if (!paused) { acc += rdt * SPEED; while (acc >= dt) { step(); acc -= dt; } }
+      if (st.t - pushT >= 0.25) {
+        pushT = st.t; cT.push(st.t, [sp.get(), st.y ?? st.T, st.T]);
+        cU.push(st.t, mode.get() === 'onoff' ? [st.u * 100, null, null, null] : [st.u * 100, st.up * 100, st.ui * 100, st.ud * 100]);
+      }
+      cT.extra = mode.get() === 'onoff' ? [{ y: sp.get() + hyst.get() / 2, color: '--muted', label: '' }, { y: sp.get() - hyst.get() / 2, color: '--muted', label: 'band' }] : [];
+      charts.forEach(c => c.draw()); draw(); explain();
+    }, S.pauseB);
+
+    let parts = [];
+    function draw() {
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
+      const tx = w * 0.18, tw = Math.min(w * 0.38, 330), ty = h * 0.18, th = h * 0.68;
+      const f = clamp((st.T - 5) / 70, 0, 1);
+      const water = `rgb(${Math.round(59 + 180 * f)},${Math.round(130 - 62 * f)},${Math.round(246 - 178 * f)})`;
+      // tank
+      ctx.lineWidth = 4; ctx.strokeStyle = css('--muted');
+      ctx.fillStyle = water; ctx.globalAlpha = .85; ctx.fillRect(tx, ty + th * .12, tw, th * .88); ctx.globalAlpha = 1;
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx, ty + th); ctx.lineTo(tx + tw, ty + th); ctx.lineTo(tx + tw, ty); ctx.stroke();
+      // heater coil
+      const ud = st.buf.length ? st.buf[0] : 0; const hc = ud >= 0 ? `rgba(255,${160 - 100 * ud},40,${0.25 + 0.75 * ud})` : `rgba(80,170,255,${0.25 - 0.75 * ud})`;
+      ctx.strokeStyle = hc; ctx.lineWidth = 6; ctx.beginPath();
+      for (let i = 0; i <= 40; i++) { const x = tx + 20 + i * (tw - 40) / 40, y = ty + th - 22 + Math.sin(i * 1.2) * 9; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+      ctx.fillStyle = css('--ctl'); ctx.font = '600 13px Inter'; ctx.textAlign = 'center';
+      ctx.fillText(ud > 0.02 ? `heating ${(ud * 100).toFixed(0)} %` : ud < -0.02 ? `cooling ${(-ud * 100).toFixed(0)} %` : 'actuator idle', tx + tw / 2, ty + th + 22);
+      if (st.buf.length > 1 && Math.abs(st.u - ud) > .05) { ctx.fillStyle = css('--muted'); ctx.fillText(`(commanded ${(st.u * 100).toFixed(0)} % — still on its way: delay)`, tx + tw / 2, ty + th + 40); }
+      // steam / ice particles
+      if (Math.random() < f * 0.6) parts.push({ x: tx + Math.random() * tw, y: ty + th * .12, v: 20 + Math.random() * 30, life: 1 });
+      parts = parts.filter(p => (p.life -= 0.015) > 0);
+      parts.forEach(p => { p.y -= p.v * 0.016; ctx.fillStyle = `rgba(220,220,230,${p.life * .5})`; ctx.beginPath(); ctx.arc(p.x + Math.sin(p.y / 9) * 4, p.y, 5 + (1 - p.life) * 9, 0, 7); ctx.fill(); });
+      // sensor
+      ctx.fillStyle = css('--sys'); ctx.fillRect(tx + tw - 26, ty - 10, 8, th * .6);
+      ctx.font = '600 12px Inter'; ctx.textAlign = 'right'; ctx.fillText('sensor', tx + tw - 30, ty + 4);
+      // thermometer gauge
+      const gx = tx + tw + 70, gy = ty, gh = th; ctx.fillStyle = css('--panel'); CL.rrect(ctx, gx - 12, gy, 24, gh, 12); ctx.fill(); ctx.strokeStyle = css('--line'); ctx.lineWidth = 2; ctx.stroke();
+      const Y = v => gy + gh - (clamp(v, 0, 80) / 80) * gh;
+      ctx.fillStyle = water; CL.rrect(ctx, gx - 8, Y(st.T), 16, gy + gh - Y(st.T) - 2, 8); ctx.fill();
+      ctx.strokeStyle = css('--ok'); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(gx - 24, Y(sp.get())); ctx.lineTo(gx + 24, Y(sp.get())); ctx.stroke();
+      ctx.fillStyle = css('--muted'); ctx.textAlign = 'left'; ctx.font = '11px Inter';
+      for (let v = 0; v <= 80; v += 20) ctx.fillText(v + '°', gx + 18, Y(v) + 4);
+      ctx.fillStyle = css('--ok'); ctx.font = '600 12px Inter'; ctx.fillText('target ' + sp.get() + '°', gx + 30, Y(sp.get()) + 4);
+      ctx.textAlign = 'left'; ctx.font = '700 30px "Space Grotesk",Inter'; ctx.fillStyle = css('--ink'); ctx.fillText(st.T.toFixed(1) + ' °C', 16, 40);
+      ctx.font = '13px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText(`room ${amb.get() - (win.get() ? 15 : 0)} °C${win.get() ? ' (window open)' : ''} • time ×${SPEED}`, 16, 62);
+      // block diagram text on right
+      if (w > 760) {
+        const bx = gx + 120; ctx.font = '600 13px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText('Error now', bx, ty + 10);
+        const e = sp.get() - st.T; ctx.font = '700 22px "Space Grotesk"'; ctx.fillStyle = css('--err'); ctx.fillText((e >= 0 ? '+' : '') + e.toFixed(2) + ' °C', bx, ty + 36);
+        const bar = (lab, v, c, yy) => { ctx.fillStyle = css('--muted'); ctx.font = '12px Inter'; ctx.fillText(lab, bx, yy); const bw = 150; ctx.fillStyle = css('--grid'); ctx.fillRect(bx + 30, yy - 10, bw, 12); ctx.fillStyle = css(c); const vv = clamp(v, -1.5, 1.5) / 1.5 * bw / 2; ctx.fillRect(bx + 30 + bw / 2 + Math.min(0, vv), yy - 10, Math.abs(vv), 12); };
+        if (mode.get() === 'pid') { bar('P', st.up, '--sys', ty + 70); bar('I', st.ui, '--ai', ty + 92); bar('D', st.ud, '--ok', ty + 114); bar('Σ', st.u, '--ctl', ty + 140); }
+      }
+    }
+    let lastEx = 0;
+    function explain() {
+      if (performance.now() - lastEx < 400) return; lastEx = performance.now();
+      const e = sp.get() - st.T, el2 = st.t - st.spT;
+      T.set('os', st.peak > 0.05 ? st.peak.toFixed(1) + ' °C' : '0'); T.set('ts', st.settle != null ? st.settle.toFixed(0) + ' s' : '…');
+      T.set('ss', e.toFixed(2) + ' °C'); T.set('en', (st.energy * 1000).toFixed(0) + ' Wh');
+      const m = [];
+      if (mode.get() === 'onoff') m.push('On–off control only knows “too cold” or “too hot”. Because of the delay, the heater keeps going after the target is reached, so the temperature cycles around the band. Cheap and robust, but never precise.');
+      else {
+        const pOnly = ki.get() === 0;
+        if (pOnly && Math.abs(e) > 0.4 && el2 > 120) m.push(`<b>Steady-state error</b> of ${e.toFixed(1)} °C. The P-term gives ${(st.up * 100).toFixed(0)} % power only because the error exists. Remove the error and the power disappears too.`);
+        if (!pOnly && Math.abs(e) < 0.4 && el2 > 60) m.push(`On target. The <span style="color:var(--ai)">I-term</span> now supplies ${(st.ui * 100).toFixed(0)} % power: it has “learned” how much power the heat leak needs.`);
+        if (Math.abs(st.u) > 0.995) m.push('<span style="color:var(--err)">The actuator is saturated. While it stays saturated, the controller has no control authority left.</span>' + (!aw.get() && ki.get() > 0 ? ' The integral keeps winding up, so expect a big overshoot later.' : ''));
+        if (kd.get() > 0 && noise.get() > 0.5) m.push('The D-term amplifies sensor noise; that is why its effort line is jittery. Real controllers filter the derivative.');
+        if (kp.get() > 45 && ki.get() > 2) m.push('Gains this high, with a delay, give persistent oscillation: the controller keeps reacting to old information.');
+      }
+      if (!m.length) m.push('Change the setpoint or press “Pour in cold water” and watch how each term reacts.');
+      exT.innerHTML = m.map(s => `<p>${s}</p>`).join('');
+    }
+    return { stop: L.stop };
+  }
+};
+
+CL.initTheme(); APPS['thermo'].mount(document.getElementById('root'), false);</script>
+<script>/* link back to the main website */
+(function () {
+  var a = document.createElement('a');
+  a.href = '../index.html'; a.textContent = '← Bhabani Shankar Dey';
+  a.style.cssText = 'display:inline-block;margin-bottom:3px;font:600 12px/1.2 Inter,system-ui,sans-serif;letter-spacing:.02em;color:var(--muted);text-decoration:none';
+  var h1 = document.querySelector('.cl-top h1');
+  if (h1) { h1.parentNode.insertBefore(a, h1); a.insertAdjacentHTML('afterend', '<br>'); }
+  else { a.style.cssText += ';position:fixed;left:12px;bottom:12px;z-index:50;padding:6px 10px;border:1px solid var(--line);border-radius:99px;background:var(--panel)'; document.body.appendChild(a); }
+})();
+</script>
+</body></html>

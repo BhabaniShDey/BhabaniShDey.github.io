@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Control Lab – pendulum</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"><style>:root{
+  --bg:#0b1020;--panel:#121a30;--panel2:#18223d;--ink:#e8edf7;--muted:#9aa7c2;--line:#26324f;--grid:#1d2742;
+  --sys:#4da3ff;--ctl:#ff9f43;--ok:#2ecc71;--err:#ff5d5d;--ai:#b48cff;--warn:#ffd166;
+  --radius:14px;font-size:16px;color-scheme:dark;
+}
+[data-theme=light]{
+  --bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2f8;--ink:#14203a;--muted:#55627f;--line:#d6dcea;--grid:#e6ebf4;
+  --sys:#1c6dd0;--ctl:#e07800;--ok:#14984a;--err:#d63031;--ai:#7a4ed6;--warn:#b7791f;color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
+h1,h2,h3{font-family:"Space Grotesk","Inter",system-ui,sans-serif;letter-spacing:-.01em;margin:0}
+a{color:var(--sys)}
+.cl-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+.cl-top h1{font-size:1.35rem}
+.cl-top .sub{color:var(--muted);font-size:.92rem}
+.cl-top .spacer{flex:1}
+.tag{display:inline-block;font-size:.75rem;font-weight:600;padding:3px 9px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.cl-app{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:14px;padding:14px;max-width:1500px;margin:0 auto}
+@media (max-width:980px){.cl-app{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.card h3{font-size:.95rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;font-weight:600}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.visual{position:relative;width:100%;aspect-ratio:16/7;border-radius:10px;overflow:hidden;background:var(--panel2)}
+.visual canvas{width:100%;height:100%;display:block;touch-action:none}
+.plots{display:grid;grid-template-columns:1fr;gap:10px}
+.plots.two{grid-template-columns:1fr 1fr}
+@media (max-width:700px){.plots.two{grid-template-columns:1fr}}
+.chart{position:relative;width:100%;height:150px}
+.chart canvas{width:100%;height:100%;display:block}
+.ctl-row{margin:8px 0 12px}
+.ctl-row label{display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:3px}
+.ctl-row label b{font-variant-numeric:tabular-nums;font-weight:600}
+input[type=range]{width:100%;accent-color:var(--ctl);height:22px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button.b{font:inherit;font-size:.88rem;font-weight:600;padding:7px 12px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);cursor:pointer}
+button.b:hover{border-color:var(--muted)}
+button.b.pri{background:var(--sys);border-color:var(--sys);color:#fff}
+button.b.warn{border-color:var(--err);color:var(--err)}
+button.b.on{outline:2px solid var(--ctl);outline-offset:1px}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:4px 0 10px}
+.seg button{flex:1;font:inherit;font-size:.85rem;padding:7px 6px;background:var(--panel2);color:var(--muted);border:0;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--sys);color:#fff;font-weight:600}
+.chk{display:flex;align-items:center;gap:8px;font-size:.9rem;margin:6px 0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.tile{background:var(--panel2);border-radius:10px;padding:8px 10px}
+.tile .k{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.tile .v{font-size:1.35rem;font-weight:700;font-variant-numeric:tabular-nums;font-family:"Space Grotesk",system-ui}
+.explain{font-size:.95rem}
+.explain p{margin:.3em 0}
+.guide .step{font-size:.93rem}
+.guide .n{color:var(--muted);font-size:.8rem}
+.guide .nav{display:flex;gap:8px;margin-top:8px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:.8rem;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-2px}
+.badge{font-weight:700;padding:4px 10px;border-radius:8px;font-size:.9rem}
+.kbd{font-family:ui-monospace,monospace;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:.85em}
+.muted{color:var(--muted)}
+.eq{font-family:"Cambria Math","STIX Two Math",Georgia,serif;font-size:1.05rem;background:var(--panel2);padding:6px 10px;border-radius:8px;display:inline-block}
+/* hub */
+.hub{max-width:1200px;margin:0 auto;padding:26px 18px 60px}
+.hub h1{font-size:2.2rem}
+.hub .lead{color:var(--muted);font-size:1.05rem;max-width:760px}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;margin-top:18px}
+.dcard{display:block;text-decoration:none;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--c);border-radius:var(--radius);padding:14px 16px;transition:transform .12s}
+.dcard:hover{transform:translateY(-2px);border-color:var(--c)}
+.dcard h2{font-size:1.15rem;margin:4px 0 6px}
+.dcard p{margin:0;color:var(--muted);font-size:.92rem}
+.dcard .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.sect{margin-top:30px;font-size:.85rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.colorkey{display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;font-size:.9rem}
+.colorkey span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--c);margin-right:6px;vertical-align:-1px}
+.overlay-msg{position:absolute;inset:auto 0 12px 0;text-align:center;pointer-events:none}
+.overlay-msg span{background:rgba(0,0,0,.6);color:#fff;padding:6px 14px;border-radius:99px;font-weight:600}
+</style></head>
+<body><div id="root"></div>
+<script>/* Control Lab — shared helpers (no external libraries) */
+window.APPS = window.APPS || {};
+const CL = (() => {
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const el = (tag, attrs = {}, kids = []) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (k === 'class') e.className = v;
+      else if (k === 'html') e.innerHTML = v;
+      else if (k === 'style') e.style.cssText = v;
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+      else e.setAttribute(k, v);
+    }
+    (Array.isArray(kids) ? kids : [kids]).forEach(c => c != null && e.append(c.nodeType ? c : document.createTextNode(c)));
+    return e;
+  };
+  let gaussSpare = null;
+  const randn = () => {
+    if (gaussSpare !== null) { const s = gaussSpare; gaussSpare = null; return s; }
+    let u = 0, v = 0; while (u === 0) u = Math.random(); v = Math.random();
+    const r = Math.sqrt(-2 * Math.log(u)); gaussSpare = r * Math.sin(2 * Math.PI * v); return r * Math.cos(2 * Math.PI * v);
+  };
+
+  function setTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    try { localStorage.setItem('cl-theme', t); } catch (e) {}
+  }
+  function initTheme() {
+    let t = 'dark'; try { t = localStorage.getItem('cl-theme') || 'dark'; } catch (e) {}
+    setTheme(t);
+  }
+
+  /* Page shell for one dashboard */
+  function shell(root, o) {
+    root.innerHTML = '';
+    const top = el('div', { class: 'cl-top' });
+    if (o.back) top.append(el('a', { href: '#', class: 'b', style: 'text-decoration:none;font-weight:600' }, '← All demos'));
+    top.append(el('div', {}, [el('h1', {}, o.title), el('div', { class: 'sub' }, o.subtitle || '')]));
+    top.append(el('div', { class: 'spacer' }));
+    if (o.tag) top.append(el('span', { class: 'tag', style: `color:var(${o.color || '--sys'})` }, o.tag));
+    if (o.audience) top.append(el('span', { class: 'tag', style: 'color:var(--muted)' }, o.audience));
+    const pauseB = el('button', { class: 'b' }, 'Pause');
+    const resetB = el('button', { class: 'b warn' }, 'Reset');
+    const themeB = el('button', { class: 'b', title: 'Light/dark (use light on bright projectors)' }, '◐');
+    themeB.onclick = () => setTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+    top.append(pauseB, resetB, themeB);
+    const app = el('div', { class: 'cl-app' });
+    const left = el('div', { class: 'col' }), right = el('div', { class: 'col' });
+    app.append(left, right);
+    root.append(top, app);
+    return { top, left, right, pauseB, resetB };
+  }
+
+  function card(parent, title, cls) {
+    const c = el('div', { class: 'card ' + (cls || '') });
+    if (title) c.append(el('h3', {}, title));
+    parent.append(c); return c;
+  }
+
+  function slider(parent, o) {
+    const fmt = o.fmt || (v => (+v).toFixed(o.dec ?? 0));
+    const val = el('b', {}, fmt(o.value) + (o.unit ? ' ' + o.unit : ''));
+    const inp = el('input', { type: 'range', min: o.min, max: o.max, step: o.step || 1, value: o.value });
+    if (o.color) inp.style.accentColor = `var(${o.color})`;
+    const row = el('div', { class: 'ctl-row' }, [el('label', {}, [el('span', {}, o.label), val]), inp]);
+    if (o.hint) row.append(el('div', { class: 'muted', style: 'font-size:.78rem' }, o.hint));
+    parent.append(row);
+    const upd = () => { val.textContent = fmt(inp.value) + (o.unit ? ' ' + o.unit : ''); o.onInput && o.onInput(+inp.value); };
+    inp.addEventListener('input', upd);
+    return { get: () => +inp.value, set: v => { inp.value = v; upd(); }, el: row, input: inp };
+  }
+
+  function seg(parent, o) {
+    const wrap = el('div', {});
+    if (o.label) wrap.append(el('div', { style: 'font-size:.9rem' }, o.label));
+    const s = el('div', { class: 'seg' }); wrap.append(s);
+    let cur = o.value; const bs = {};
+    o.options.forEach(([v, lab]) => {
+      const b = el('button', {}, lab); bs[v] = b;
+      b.onclick = () => { set(v); };
+      s.append(b);
+    });
+    function set(v, silent) { cur = v; Object.entries(bs).forEach(([k, b]) => b.classList.toggle('on', k == v)); if (!silent) o.onChange && o.onChange(v); }
+    set(cur, true); parent.append(wrap);
+    return { get: () => cur, set };
+  }
+
+  function check(parent, label, value, onChange) {
+    const i = el('input', { type: 'checkbox' }); i.checked = !!value;
+    i.onchange = () => onChange && onChange(i.checked);
+    const l = el('label', { class: 'chk' }, [i, label]); parent.append(l);
+    return { get: () => i.checked, set: v => { i.checked = v; onChange && onChange(v); } };
+  }
+
+  function button(parent, label, onClick, cls) {
+    const b = el('button', { class: 'b ' + (cls || '') }, label); b.onclick = onClick; parent.append(b); return b;
+  }
+
+  function tiles(parent, defs) {
+    const t = el('div', { class: 'tiles' }); const out = {};
+    defs.forEach(([key, label, color]) => {
+      const v = el('div', { class: 'v', style: color ? `color:var(${color})` : '' }, '–');
+      t.append(el('div', { class: 'tile' }, [el('div', { class: 'k' }, label), v])); out[key] = v;
+    });
+    parent.append(t);
+    return { set: (k, s) => { out[k].textContent = s; }, color: (k, c) => { out[k].style.color = `var(${c})`; } };
+  }
+
+  function guide(parent, steps, onStep) {
+    const c = card(parent, 'Guided experiment', 'guide');
+    const n = el('div', { class: 'n' }), h = el('div', { style: 'font-weight:700;margin:2px 0 4px' }), t = el('div', { class: 'step' });
+    const nav = el('div', { class: 'nav' });
+    let i = 0;
+    const prev = button(nav, '‹ Back', () => go(i - 1));
+    const doB = button(nav, 'Set it up for me', () => steps[i].setup && steps[i].setup(), 'pri');
+    const next = button(nav, 'Next ›', () => go(i + 1));
+    c.append(n, h, t, nav);
+    function go(k) {
+      i = clamp(k, 0, steps.length - 1);
+      n.textContent = `Step ${i + 1} of ${steps.length}`; h.textContent = steps[i].title; t.innerHTML = steps[i].text;
+      doB.style.display = steps[i].setup ? '' : 'none';
+      prev.disabled = i === 0; next.disabled = i === steps.length - 1;
+      onStep && onStep(i);
+    }
+    go(0); return { go };
+  }
+
+  /* Canvas sized to its box, with devicePixelRatio */
+  function canvasIn(container) {
+    const cv = el('canvas'); container.append(cv);
+    const ctx = cv.getContext('2d');
+    const st = { cv, ctx, w: 1, h: 1 };
+    const fit = () => {
+      const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+      st.w = Math.max(1, r.width); st.h = Math.max(1, r.height);
+      cv.width = Math.round(st.w * d); cv.height = Math.round(st.h * d); ctx.setTransform(d, 0, 0, d, 0, 0);
+    };
+    fit();
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(cv); else window.addEventListener('resize', fit);
+    st.fit = fit; return st;
+  }
+
+  /* Time-series / XY chart */
+  class Chart {
+    constructor(parent, o) {
+      this.o = Object.assign({ window: 30, height: 150, yMin: null, yMax: null, minSpan: 1, xLabel: 't (s)' }, o);
+      const box = el('div', { class: 'chart', style: `height:${this.o.height}px` }); parent.append(box);
+      this.c = canvasIn(box); this.clear();
+    }
+    clear() { this.t = []; this.d = this.o.series.map(() => []); this.xs = null; this.extra = []; }
+    push(t, vals) {
+      this.t.push(t); vals.forEach((v, i) => this.d[i].push(v));
+      if (this.t.length > 6000) { this.t.splice(0, 2000); this.d.forEach(a => a.splice(0, 2000)); }
+    }
+    setData(xs, ys) { this.t = xs; this.d = ys; }
+    draw(xRange) {
+      const { ctx, w, h } = this.c, o = this.o;
+      ctx.clearRect(0, 0, w, h);
+      const L = 46, R = 10, T = 22, B = 20, pw = w - L - R, ph = h - T - B;
+      const n = this.t.length;
+      let x1 = xRange ? xRange[1] : (n ? this.t[n - 1] : 0), x0 = xRange ? xRange[0] : Math.max(0, x1 - o.window);
+      if (!xRange && x1 < o.window) { x0 = 0; x1 = o.window; }
+      let i0 = 0; while (i0 < n && this.t[i0] < x0) i0++;
+      let lo = Infinity, hi = -Infinity;
+      this.d.forEach((a, si) => { if (o.series[si].noscale) return; for (let i = i0; i < n; i++) { const v = a[i]; if (v == null || !isFinite(v)) continue; if (v < lo) lo = v; if (v > hi) hi = v; } });
+      (this.extra || []).forEach(e => { if (e.y != null) { lo = Math.min(lo, e.y); hi = Math.max(hi, e.y); } });
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      if (o.yMin != null) lo = o.yMin; if (o.yMax != null) hi = o.yMax;
+      if (hi - lo < o.minSpan) { const m = (hi + lo) / 2; lo = m - o.minSpan / 2; hi = m + o.minSpan / 2; }
+      if (o.yMin == null || o.yMax == null) { const p = (hi - lo) * 0.08; if (o.yMin == null) lo -= p; if (o.yMax == null) hi += p; }
+      const X = x => L + (x - x0) / (x1 - x0 || 1) * pw, Y = y => T + (1 - (y - lo) / (hi - lo)) * ph;
+      this.X = X; this.Y = Y;
+      ctx.font = '11px Inter,system-ui,sans-serif'; ctx.fillStyle = css('--muted'); ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1;
+      const step = niceStep((hi - lo) / 4);
+      for (let y = Math.ceil(lo / step) * step; y <= hi + 1e-9; y += step) {
+        ctx.beginPath(); ctx.moveTo(L, Y(y)); ctx.lineTo(L + pw, Y(y)); ctx.stroke();
+        ctx.textAlign = 'right'; ctx.fillText(fmtNum(y, step), L - 5, Y(y) + 4);
+      }
+      const xs = niceStep((x1 - x0) / 6);
+      ctx.textAlign = 'center';
+      for (let x = Math.ceil(x0 / xs) * xs; x <= x1 + 1e-9; x += xs) ctx.fillText(o.xFmt ? o.xFmt(x) : fmtNum(x, xs), X(x), h - 5);
+      if (o.zero && lo < 0 && hi > 0) { ctx.strokeStyle = css('--muted'); ctx.globalAlpha = .5; ctx.beginPath(); ctx.moveTo(L, Y(0)); ctx.lineTo(L + pw, Y(0)); ctx.stroke(); ctx.globalAlpha = 1; }
+      (this.extra || []).forEach(e => { // horizontal reference lines
+        ctx.save(); ctx.strokeStyle = css(e.color); ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(L, Y(e.y)); ctx.lineTo(L + pw, Y(e.y)); ctx.stroke();
+        ctx.fillStyle = css(e.color); ctx.textAlign = 'left'; ctx.fillText(e.label || '', L + 4, Y(e.y) - 4); ctx.restore();
+      });
+      ctx.save(); ctx.beginPath(); ctx.rect(L, T - 2, pw, ph + 4); ctx.clip();
+      o.series.forEach((s, si) => {
+        const a = this.d[si]; ctx.strokeStyle = css(s.color); ctx.lineWidth = s.width || 2; ctx.setLineDash(s.dash || []);
+        ctx.globalAlpha = s.alpha || 1;
+        if (s.bars) {
+          ctx.fillStyle = css(s.color); const bw = pw / Math.max(1, (x1 - x0)) * (s.bars);
+          for (let i = i0; i < n; i++) { const v = a[i]; if (v == null) continue; ctx.fillRect(X(this.t[i]) - bw / 2, Math.min(Y(0), Y(v)), bw, Math.abs(Y(v) - Y(0))); }
+        } else {
+          ctx.beginPath(); let pen = false; const stride = Math.max(1, Math.floor((n - i0) / (pw * 1.5)));
+          for (let i = i0; i < n; i += stride) { const v = a[i]; if (v == null || !isFinite(v)) { pen = false; continue; } const px = X(this.t[i]), py = Y(v); if (!pen) { ctx.moveTo(px, py); pen = true; } else ctx.lineTo(px, py); }
+          if (s.step) { /* ok */ }
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      });
+      ctx.restore(); ctx.setLineDash([]);
+      if (this.vline != null) { ctx.strokeStyle = css('--ink'); ctx.globalAlpha = .5; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(this.vline), T); ctx.lineTo(X(this.vline), T + ph); ctx.stroke(); ctx.globalAlpha = 1; }
+      // title + legend
+      ctx.textAlign = 'left'; ctx.font = '600 12px Inter,system-ui,sans-serif'; ctx.fillStyle = css('--ink');
+      ctx.fillText(o.title || '', L, 14);
+      let lx = L + ctx.measureText(o.title || '').width + 14; ctx.font = '11px Inter,system-ui,sans-serif';
+      o.series.forEach((s, si) => {
+        if (s.nolegend) return;
+        const last = this.d[si][n - 1];
+        const txt = s.name + (last != null && isFinite(last) && !xRange ? ' ' + last.toFixed(s.dec ?? 1) : '');
+        ctx.strokeStyle = css(s.color); ctx.lineWidth = 2.5; ctx.setLineDash(s.dash || []); ctx.beginPath(); ctx.moveTo(lx, 10); ctx.lineTo(lx + 14, 10); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = css('--muted'); ctx.fillText(txt, lx + 18, 14); lx += 26 + ctx.measureText(txt).width;
+      });
+      if (o.yUnit && lx < w - 40) { ctx.fillStyle = css('--muted'); ctx.textAlign = 'right'; ctx.fillText(o.yUnit, w - R, 14); }
+    }
+  }
+  function niceStep(r) { if (!(r > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(r))), f = r / p; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p; }
+  function fmtNum(v, step) { const d = step >= 1 ? 0 : Math.min(3, Math.ceil(-Math.log10(step))); return (Math.abs(v) < 1e-9 ? 0 : v).toFixed(d); }
+
+  /* Animation loop with pause; step(dtReal) */
+  function loop(step, pauseB) {
+    let last = performance.now(), alive = true, paused = false;
+    if (pauseB) pauseB.onclick = () => { paused = !paused; pauseB.textContent = paused ? 'Resume' : 'Pause'; pauseB.classList.toggle('pri', paused); };
+    let nerr = 0;
+    function f(now) { if (!alive) return; requestAnimationFrame(f); const dt = Math.min(0.05, (now - last) / 1000); last = now; try { step(paused ? 0 : dt, paused); } catch (e) { if (nerr++ < 3) console.error(e); } }
+    requestAnimationFrame(f);
+    return { stop: () => { alive = false; }, isPaused: () => paused, setPaused: p => { if (p !== paused) pauseB ? pauseB.onclick() : (paused = p); } };
+  }
+
+  function arrow(ctx, x0, y0, x1, y1, color, w = 3, label) {
+    const a = Math.atan2(y1 - y0, x1 - x0), L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    ctx.save(); ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - Math.cos(a) * 8, y1 - Math.sin(a) * 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - 12 * Math.cos(a - .45), y1 - 12 * Math.sin(a - .45)); ctx.lineTo(x1 - 12 * Math.cos(a + .45), y1 - 12 * Math.sin(a + .45)); ctx.closePath(); ctx.fill();
+    if (label) { ctx.font = '600 12px Inter,system-ui'; ctx.textAlign = 'center'; ctx.fillText(label, (x0 + x1) / 2, (y0 + y1) / 2 - 8); }
+    ctx.restore();
+  }
+  function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function alpha(hex, a) { // css color '#rrggbb' -> rgba
+    hex = hex.replace('#', ''); if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    const n = parseInt(hex, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
+  }
+
+  return { css, clamp, el, randn, shell, card, slider, seg, check, button, tiles, guide, canvasIn, Chart, loop, arrow, rrect, alpha, initTheme, setTheme };
+})();
+</script>
+<script>APPS.pendulum = {
+  title: 'Stabilize an Inverted Pendulum', concept: 'Stability and nonlinear control', audience: 'UG / PG', color: '--sys',
+  blurb: 'The classic benchmark behind Segways, rockets and walking robots. Balance it yourself, then let state feedback (LQR) and an energy-based swing-up do it.',
+  mount(root, back) {
+    const { css, clamp, el, randn } = CL;
+    const S = CL.shell(root, { back, title: this.title, subtitle: 'ẋ = f(x, u),  x = [cart position, cart velocity, angle, angular velocity],  u = force on the cart', tag: this.concept, audience: this.audience, color: this.color });
+    const g = 9.81, b = 0.1, Mc = 1.0, mNom = 0.2, LNom = 0.5, TRACK = 2.5;
+    const Pm = [[11.66, 6.297, 14.832, 3.648], [6.297, 5.818, 13.646, 3.497], [14.832, 13.646, 57.319, 10.5], [3.648, 3.497, 10.5, 2.49]]; // LQR Riccati solution (nominal)
+    let st, keys = { l: 0, r: 0 }, hist = [];
+    const reset = (down) => {
+      st = { t: 0, x: 0, xd: 0, th: down ? Math.PI - 0.05 : 0.12, thd: 0, F: 0, status: 'ok', bal: 0, best: st ? st.best : 0, ctrlOn: true, swing: false, Fq: [] };
+      hist = []; charts.forEach(c => c.clear());
+    };
+    const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
+
+    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/7.5' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots two' }); S.left.append(pl);
+    const cTh = new CL.Chart(pl, { title: 'Pole angle from upright', yUnit: 'deg', window: 15, minSpan: 10, zero: true, height: 140, series: [{ name: 'θ', color: '--sys' }] });
+    const cX = new CL.Chart(pl, { title: 'Cart position', yUnit: 'm', window: 15, minSpan: 1, zero: true, height: 140, series: [{ name: 'x', color: '--sys' }, { name: 'target', color: '--ok', dash: [6, 4] }] });
+    const cF = new CL.Chart(pl, { title: 'Control force', yUnit: 'N', window: 15, minSpan: 10, zero: true, height: 140, series: [{ name: 'u', color: '--ctl' }] });
+    const cV = new CL.Chart(pl, { title: 'Lyapunov function V = xᵀPx', yUnit: '', window: 15, minSpan: .5, yMin: 0, height: 140, series: [{ name: 'V', color: '--ai' }] });
+    const charts = [cTh, cX, cF, cV];
+
+    const tl = CL.card(S.right, 'Status');
+    const T = CL.tiles(tl, [['st', 'State', '--ok'], ['bal', 'Balanced for', '--sys'], ['best', 'Best (manual)', '--ctl']]);
+
+    const mc = CL.card(S.right, 'Who is in control?');
+    const mode = CL.seg(mc, { options: [['auto', 'Feedback controller'], ['manual', 'You'], ['off', 'Nobody']], value: 'auto', onChange: v => { if (v === 'manual') { reset(false); st.th = 0.03; } } });
+    const manHint = el('div', { class: 'muted', style: 'font-size:.85rem' }, ['Hold ', el('span', { class: 'kbd' }, '←'), ' / ', el('span', { class: 'kbd' }, '→'), ' or the buttons below to push the cart.']); mc.append(manHint);
+    const mb = el('div', { class: 'btns', style: 'margin-top:6px' }); mc.append(mb);
+    const hold = (b, k) => { const on = e => { e.preventDefault(); keys[k] = 1; }, off = () => { keys[k] = 0; }; b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); };
+    hold(CL.button(mb, '◀ push left', () => { }), 'l'); hold(CL.button(mb, 'push right ▶', () => { }), 'r');
+    const swing = CL.check(mc, 'Energy-based swing-up when the pole is down (nonlinear)', true);
+
+    const kc = CL.card(S.right, 'State-feedback gains'); kc.append(CL.el('div', { class: 'eq', style: 'margin-bottom:6px' }, 'u = Kθ·θ + Kω·ω + Kx·(x − x*) + Kv·v'));
+    const kth = CL.slider(kc, { label: 'Kθ  angle', min: 0, max: 150, step: .5, value: 73.5, dec: 1, color: '--ctl' });
+    const kw = CL.slider(kc, { label: 'Kω  angular velocity', min: 0, max: 30, step: .1, value: 14.8, dec: 1, color: '--ctl' });
+    const kx = CL.slider(kc, { label: 'Kx  cart position', min: 0, max: 30, step: .1, value: 10, dec: 1, color: '--ctl' });
+    const kv = CL.slider(kc, { label: 'Kv  cart velocity', min: 0, max: 30, step: .1, value: 11.8, dec: 1, color: '--ctl' });
+    const pr = el('div', { class: 'btns' }); kc.append(pr);
+    const preset = (a, b2, c, d) => () => { mode.set('auto'); kth.set(a); kw.set(b2); kx.set(c); kv.set(d); };
+    CL.button(pr, 'LQR (optimal)', preset(73.5, 14.8, 10, 11.8), 'pri'); CL.button(pr, 'Angle only', preset(73.5, 14.8, 0, 0)); CL.button(pr, 'Too weak', preset(10, 3, 0, 0), 'warn'); CL.button(pr, 'Over-damped', preset(40, 30, 3, 8));
+
+    const dc = CL.card(S.right, 'Reality check: disturbances and uncertainty');
+    const xt = CL.slider(dc, { label: 'Target cart position x*', min: -1.5, max: 1.5, step: .1, value: 0, dec: 1, unit: 'm', color: '--ok' });
+    const fmax = CL.slider(dc, { label: 'Motor force limit', min: 5, max: 80, step: 1, value: 40, unit: 'N', color: '--err' });
+    const nz = CL.slider(dc, { label: 'Angle sensor noise', min: 0, max: 3, step: .1, value: 0, dec: 1, unit: 'deg', color: '--err' });
+    const dly = CL.slider(dc, { label: 'Control delay', min: 0, max: 120, step: 5, value: 0, unit: 'ms', color: '--err' });
+    const mp = CL.slider(dc, { label: 'Real pole mass (controller assumes 0.2 kg)', min: .05, max: 1.2, step: .05, value: .2, dec: 2, unit: 'kg', color: '--err' });
+    const wind = CL.slider(dc, { label: 'Random push (wind)', min: 0, max: 6, step: .5, value: 0, dec: 1, unit: 'N', color: '--err' });
+    const db = el('div', { class: 'btns' }); dc.append(db);
+    CL.button(db, '👉 Tap the pole', () => { st.thd += (Math.random() < .5 ? -1 : 1) * 1.6; }, 'warn');
+    CL.button(db, 'Start hanging down', () => reset(true));
+    CL.button(db, 'Start upright', () => reset(false));
+
+    const ex = CL.card(S.right, 'What you are seeing', 'explain'); const exT = el('div'); ex.append(exT);
+    CL.guide(S.right, [
+      { title: 'Nobody in control', text: 'Choose <b>Nobody</b>. Upright is an <b>equilibrium</b> (forces balance), but an <b>unstable</b> one: the tiniest tilt grows. Where does the pole end up? Hanging down is the stable equilibrium.', setup: () => { mode.set('off'); reset(false); } },
+      { title: 'You are the controller', text: 'Choose <b>You</b> and keep the pole up with the arrow keys. You will find yourself moving the cart <i>under</i> the falling pole, just as you move your hand under a balanced broomstick.', setup: () => { mode.set('manual'); } },
+      { title: 'Angle feedback only', text: 'Press <b>Angle only</b>. The pole stays up, but the cart drifts and eventually hits the end of the track. Stabilising one variable is not enough: the controller must watch the <b>whole state</b>.', setup: () => { preset(73.5, 14.8, 0, 0)(); reset(false); } },
+      { title: 'Full state feedback (LQR)', text: 'Press <b>LQR</b>. Now the pole stays up <i>and</i> the cart returns to x*. Move the target slider: notice the cart first moves the <i>wrong</i> way to tilt the pole in the direction it wants to travel. V(x) keeps decreasing — that is a Lyapunov certificate.', setup: () => { preset(73.5, 14.8, 10, 11.8)(); reset(false); } },
+      { title: 'Robustness test', text: 'Increase the real pole mass, add noise, a 60 ms delay and wind. Linear LQR tolerates a surprising amount — until it does not. Robust control asks: <i>how much uncertainty can we guarantee to survive?</i>', setup: () => { mp.set(.5); nz.set(1); dly.set(60); wind.set(2); } },
+      { title: 'Nonlinear: swing-up', text: 'Press <b>Start hanging down</b>. A linear controller is useless 180° away from upright. A nonlinear energy-pumping law swings the pole up, then hands over to LQR near the top. This is a hybrid nonlinear controller.', setup: () => { mp.set(.2); nz.set(0); dly.set(0); wind.set(0); preset(73.5, 14.8, 10, 11.8)(); swing.set(true); reset(true); } },
+    ]);
+    S.resetB.onclick = () => reset(false); reset(false);
+    const kd = e => { if (e.key === 'ArrowLeft') { keys.l = 1; e.preventDefault(); } if (e.key === 'ArrowRight') { keys.r = 1; e.preventDefault(); } };
+    const ku = e => { if (e.key === 'ArrowLeft') keys.l = 0; if (e.key === 'ArrowRight') keys.r = 0; };
+    window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
+    cv.cv.addEventListener('pointerdown', e => { const r = cv.cv.getBoundingClientRect(); const px = e.clientX - r.left; st.thd += (px < geo.bx ? -1 : 1) * 1.4; });
+
+    function deriv(s, F, m, L) {
+      const sn = Math.sin(s.th), cs = Math.cos(s.th);
+      const xdd = (F - b * s.xd + m * L * s.thd * s.thd * sn - m * g * sn * cs) / (Mc + m * sn * sn);
+      const thdd = (g * sn - xdd * cs) / L - 0.02 * s.thd;
+      return [s.xd, xdd, s.thd, thdd];
+    }
+    function controller() {
+      const thm = wrap(st.th) + nz.get() * Math.PI / 180 * randn();
+      const m = mNom, L = LNom;
+      if (mode.get() === 'off') return 0;
+      if (mode.get() === 'manual') return (keys.r - keys.l) * 15;
+      const near = Math.abs(thm) < 0.6;
+      if (!near) {
+        st.swing = swing.get();
+        if (!swing.get()) return 0;
+        const E = 0.5 * m * L * L * st.thd * st.thd + m * g * L * (Math.cos(thm) - 1);
+        let a = clamp(30 * E * Math.sign(st.thd * Math.cos(thm) || 1), -7, 7) - 2.0 * (st.x - 0) - 2.5 * st.xd;
+        if (Math.abs(E) < 0.01 && Math.abs(thm) > 2.9 && Math.abs(st.thd) < 0.05) a = 6; // kick if resting at the bottom
+        const sn = Math.sin(thm), cs = Math.cos(thm);
+        return (Mc + m * sn * sn) * a + b * st.xd - m * L * st.thd * st.thd * sn + m * g * sn * cs;
+      }
+      st.swing = false;
+      return kth.get() * thm + kw.get() * st.thd + kx.get() * (st.x - xt.get()) + kv.get() * st.xd;
+    }
+    const dt = 0.002; let wnd = 0;
+    function step() {
+      let F = clamp(controller(), -fmax.get(), fmax.get());
+      st.Fq.push(F); const nd = Math.round(dly.get() / 1000 / dt); while (st.Fq.length > nd + 1) st.Fq.shift(); F = st.Fq[0];
+      st.F = F;
+      wnd += (wind.get() * randn() * 3 - wnd) * dt / 0.3;
+      const m = mp.get(), L = LNom, Ft = F + wnd;
+      const s = st, k1 = deriv(s, Ft, m, L);
+      const s2 = { x: s.x + k1[0] * dt / 2, xd: s.xd + k1[1] * dt / 2, th: s.th + k1[2] * dt / 2, thd: s.thd + k1[3] * dt / 2 }, k2 = deriv(s2, Ft, m, L);
+      const s3 = { x: s.x + k2[0] * dt / 2, xd: s.xd + k2[1] * dt / 2, th: s.th + k2[2] * dt / 2, thd: s.thd + k2[3] * dt / 2 }, k3 = deriv(s3, Ft, m, L);
+      const s4 = { x: s.x + k3[0] * dt, xd: s.xd + k3[1] * dt, th: s.th + k3[2] * dt, thd: s.thd + k3[3] * dt }, k4 = deriv(s4, Ft, m, L);
+      s.x += dt / 6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]); s.xd += dt / 6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
+      s.th += dt / 6 * (k1[2] + 2 * k2[2] + 2 * k3[2] + k4[2]); s.thd += dt / 6 * (k1[3] + 2 * k2[3] + 2 * k3[3] + k4[3]);
+      if (Math.abs(s.x) > TRACK) { s.x = Math.sign(s.x) * TRACK; s.xd = -0.2 * s.xd; s.thd += 0; s.status = 'crash'; s.crashT = s.t; }
+      st.t += dt;
+      const up = Math.abs(wrap(st.th)) < 0.35;
+      if (up) { st.bal += dt; if (mode.get() === 'manual') st.best = Math.max(st.best, st.bal); } else st.bal = 0;
+      st.status = s.crashT != null && s.t - s.crashT < 1 ? 'crash' : up ? 'ok' : st.swing ? 'swing' : 'fall';
+    }
+    let acc = 0, pushT = -1;
+    const L = CL.loop((rdt, paused) => {
+      if (!paused) { acc += rdt; let n = 0; while (acc >= dt && n++ < 60) { step(); acc -= dt; } if (n >= 60) acc = 0; }
+      if (st.t - pushT >= 0.03) {
+        pushT = st.t; const th = wrap(st.th);
+        const xv = [st.x - xt.get(), st.xd, th, st.thd]; let V = 0; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) V += xv[i] * Pm[i][j] * xv[j];
+        cTh.push(st.t, [th * 180 / Math.PI]); cX.push(st.t, [st.x, xt.get()]); cF.push(st.t, [st.F]); cV.push(st.t, [Math.abs(th) < 0.6 ? V : null]);
+        hist.push([th, st.thd]); if (hist.length > 400) hist.shift();
+      }
+      charts.forEach(c => c.draw()); draw(); explain();
+    }, S.pauseB);
+    const geo = { bx: 0 };
+    function draw() {
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
+      const pw = w > 700 ? w * 0.72 : w; const sc = (pw - 60) / (2 * TRACK + 0.6); const cx0 = 30 + (TRACK + 0.3) * sc; const ty = h * 0.78;
+      // rails
+      ctx.strokeStyle = css('--muted'); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(cx0 - (TRACK + .2) * sc, ty); ctx.lineTo(cx0 + (TRACK + .2) * sc, ty); ctx.stroke();
+      ctx.fillStyle = css('--err'); [-1, 1].forEach(sg => ctx.fillRect(cx0 + sg * (TRACK + .2) * sc - 5, ty - 30, 10, 34));
+      ctx.fillStyle = css('--ok'); ctx.beginPath(); ctx.moveTo(cx0 + xt.get() * sc, ty + 6); ctx.lineTo(cx0 + xt.get() * sc - 8, ty + 20); ctx.lineTo(cx0 + xt.get() * sc + 8, ty + 20); ctx.fill();
+      ctx.font = '11px Inter'; ctx.textAlign = 'center'; ctx.fillText('x*', cx0 + xt.get() * sc, ty + 33);
+      const bx = cx0 + st.x * sc; geo.bx = bx;
+      const sz = Math.max(40, sc * 0.35);
+      ctx.fillStyle = css('--sys'); CL.rrect(ctx, bx - sz / 2, ty - sz * .55, sz, sz * .5, 6); ctx.fill();
+      ctx.fillStyle = '#111'; [-1, 1].forEach(sg => { ctx.beginPath(); ctx.arc(bx + sg * sz * .3, ty - 4, 6, 0, 7); ctx.fill(); });
+      const pivY = ty - sz * .55; const Lp = Math.min(h * 0.62, sc * 1.1);
+      const px = bx + Lp * Math.sin(st.th), py = pivY - Lp * Math.cos(st.th);
+      const col = st.status === 'ok' ? css('--sys') : st.status === 'swing' ? css('--ai') : css('--err');
+      ctx.strokeStyle = col; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(bx, pivY); ctx.lineTo(px, py); ctx.stroke();
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, py, 6 + 10 * Math.sqrt(mp.get() / .2) * .8, 0, 7); ctx.fill();
+      ctx.strokeStyle = CL.alpha(css('--ok'), .5); ctx.setLineDash([4, 5]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bx, pivY); ctx.lineTo(bx, pivY - Lp); ctx.stroke(); ctx.setLineDash([]);
+      // force arrow
+      const fa = st.F / 40 * sc * 0.8; if (Math.abs(fa) > 3) CL.arrow(ctx, bx + Math.sign(fa) * sz / 2, ty - sz * .3, bx + Math.sign(fa) * sz / 2 + fa, ty - sz * .3, css('--ctl'), 5);
+      if (Math.abs(wnd) > .3) CL.arrow(ctx, bx - wnd * 8, ty - sz * .8, bx, ty - sz * .8, CL.alpha(css('--err'), .8), 2);
+      ctx.textAlign = 'left'; ctx.font = '700 18px "Space Grotesk",Inter'; ctx.fillStyle = col;
+      const lab = { ok: 'BALANCED', fall: mode.get() === 'auto' && !swing.get() ? 'OUTSIDE REGION OF ATTRACTION – controller off' : 'FALLING / DOWN', swing: 'SWINGING UP (energy control)', crash: 'HIT THE END STOP' }[st.status];
+      ctx.fillText(lab, 14, 28);
+      ctx.font = '13px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText(`θ = ${(wrap(st.th) * 180 / Math.PI).toFixed(1)}°   x = ${st.x.toFixed(2)} m   u = ${st.F.toFixed(1)} N`, 14, 48);
+      if (mode.get() === 'manual') { ctx.fillStyle = css('--ctl'); ctx.fillText('You are the controller: ← →  (click the scene to tap the pole)', 14, 68); }
+      // phase portrait
+      if (w > 700) {
+        const ox = w * 0.74, ow = w * 0.24, oy = 16, oh = h - 40; ctx.fillStyle = css('--panel'); CL.rrect(ctx, ox, oy, ow, oh, 10); ctx.fill();
+        ctx.fillStyle = css('--muted'); ctx.font = '600 12px Inter'; ctx.fillText('Phase portrait (θ, ω)', ox + 10, oy + 18);
+        const cxp = ox + ow / 2, cyp = oy + oh / 2 + 8, sx = ow / 2 / 0.8, sy = (oh / 2 - 20) / 4;
+        ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ox + 6, cyp); ctx.lineTo(ox + ow - 6, cyp); ctx.moveTo(cxp, oy + 26); ctx.lineTo(cxp, oy + oh - 6); ctx.stroke();
+        ctx.fillStyle = css('--ok'); ctx.beginPath(); ctx.arc(cxp, cyp, 5, 0, 7); ctx.fill(); ctx.font = '11px Inter'; ctx.fillText('goal', cxp + 7, cyp - 6);
+        ctx.save(); ctx.beginPath(); ctx.rect(ox, oy + 22, ow, oh - 22); ctx.clip();
+        ctx.strokeStyle = css('--sys'); ctx.lineWidth = 1.5; ctx.beginPath();
+        hist.forEach((p, i) => { const X = cxp + p[0] * sx, Y = cyp - p[1] * sy; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.stroke();
+        const lp = hist[hist.length - 1]; if (lp) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cxp + lp[0] * sx, cyp - lp[1] * sy, 5, 0, 7); ctx.fill(); }
+        ctx.restore(); ctx.fillStyle = css('--muted'); ctx.fillText('θ →', ox + ow - 30, cyp + 14); ctx.fillText('ω ↑', cxp + 4, oy + 34);
+      }
+    }
+    let lastEx = 0;
+    function explain() {
+      if (performance.now() - lastEx < 400) return; lastEx = performance.now();
+      const lab = { ok: 'Balanced', fall: 'Down', swing: 'Swing-up', crash: 'Crashed' }[st.status];
+      T.set('st', lab); T.color('st', st.status === 'ok' ? '--ok' : st.status === 'swing' ? '--ai' : '--err'); T.set('bal', st.bal.toFixed(1) + ' s'); T.set('best', st.best.toFixed(1) + ' s');
+      const m = [], md = mode.get();
+      if (md === 'off') m.push('No control: the upright equilibrium is unstable, so gravity wins and the pole falls to the stable hanging position.');
+      if (md === 'manual') m.push('Your brain is closing the loop: eyes are the sensor, your fingers the actuator. Your reaction time (~0.2 s) is a delay, which is why this is hard.');
+      if (md === 'auto') {
+        if (st.status === 'ok' && kx.get() === 0 && kv.get() === 0) m.push('The angle is stabilised, but nothing controls the cart position, so the cart drifts. Part of the state is uncontrolled.');
+        else if (st.status === 'ok') m.push(`Every ${(dt * 1000).toFixed(0)} ms the controller measures the full state and sets u = K·x. The purple V(x) curve going down shows the system losing “error energy”: a Lyapunov function.`);
+        if (kth.get() < (Mc + mp.get()) * g && kth.get() > 0) m.push(`Kθ is below (M+m)·g ≈ ${((Mc + mp.get()) * g).toFixed(1)} N/rad: the controller cannot push hard enough to beat gravity, whatever the other gains are.`);
+        if (st.status === 'swing') m.push('Far from upright, a nonlinear law pumps energy into the pole (like pumping a swing). Near the top it hands over to the linear LQR controller.');
+        if (Math.abs(st.F) >= fmax.get() - .01) m.push('<span style="color:var(--err)">Motor at its force limit (saturation).</span>');
+        if (mp.get() !== .2) m.push(`The real pole is ${mp.get()} kg but the gains were designed for 0.2 kg. Feedback gives robustness, within limits.`);
+      }
+      exT.innerHTML = m.map(s => `<p>${s}</p>`).join('');
+    }
+    return { stop: () => { L.stop(); window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); } };
+  }
+};
+
+CL.initTheme(); APPS['pendulum'].mount(document.getElementById('root'), false);</script>
+<script>/* link back to the main website */
+(function () {
+  var a = document.createElement('a');
+  a.href = '../index.html'; a.textContent = '← Bhabani Shankar Dey';
+  a.style.cssText = 'display:inline-block;margin-bottom:3px;font:600 12px/1.2 Inter,system-ui,sans-serif;letter-spacing:.02em;color:var(--muted);text-decoration:none';
+  var h1 = document.querySelector('.cl-top h1');
+  if (h1) { h1.parentNode.insertBefore(a, h1); a.insertAdjacentHTML('afterend', '<br>'); }
+  else { a.style.cssText += ';position:fixed;left:12px;bottom:12px;z-index:50;padding:6px 10px;border:1px solid var(--line);border-radius:99px;background:var(--panel)'; document.body.appendChild(a); }
+})();
+</script>
+</body></html>
