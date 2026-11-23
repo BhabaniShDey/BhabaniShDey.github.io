@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Control Lab – pendulum</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"><style>:root{
+<title>Traffic Controller · Close the Loop</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"><style>:root{
   --bg:#0b1020;--panel:#121a30;--panel2:#18223d;--ink:#e8edf7;--muted:#9aa7c2;--line:#26324f;--grid:#1d2742;
   --sys:#4da3ff;--ctl:#ff9f43;--ok:#2ecc71;--err:#ff5d5d;--ai:#b48cff;--warn:#ffd166;
   --radius:14px;font-size:16px;color-scheme:dark;
@@ -325,194 +325,220 @@ const CL = (() => {
   return { css, clamp, el, randn, shell, card, slider, seg, check, button, tiles, guide, canvasIn, Chart, loop, arrow, rrect, alpha, initTheme, setTheme };
 })();
 </script>
-<script>APPS.pendulum = {
-  title: 'Stabilize an Inverted Pendulum', concept: 'Stability and nonlinear control', audience: 'UG / PG', color: '--sys',
-  blurb: 'The classic benchmark behind Segways, rockets and walking robots. Balance it yourself, then let state feedback (LQR) and an energy-based swing-up do it.',
+<script>/* School mini-games */
+function gameShell(root, back, o) {
+  const S = CL.shell(root, { back, title: o.title, subtitle: o.subtitle, tag: 'Mini-game', audience: 'School students', color: o.color });
+  return S;
+}
+
+APPS['game-shower'] = {
+  title: 'Game: The Perfect Shower', concept: 'Feedback with delay', audience: 'School (Class 8–12)', color: '--ctl', game: true,
+  blurb: 'Keep the shower between 37 °C and 40 °C for 60 seconds. The catch: hot water takes 2 seconds to reach you. Then watch a controller try.',
   mount(root, back) {
     const { css, clamp, el, randn } = CL;
-    const S = CL.shell(root, { back, title: this.title, subtitle: 'ẋ = f(x, u),  x = [cart position, cart velocity, angle, angular velocity],  u = force on the cart', tag: this.concept, audience: this.audience, color: this.color });
-    const g = 9.81, b = 0.1, Mc = 1.0, mNom = 0.2, LNom = 0.5, TRACK = 2.5;
-    const Pm = [[11.66, 6.297, 14.832, 3.648], [6.297, 5.818, 13.646, 3.497], [14.832, 13.646, 57.319, 10.5], [3.648, 3.497, 10.5, 2.49]]; // LQR Riccati solution (nominal)
-    let st, keys = { l: 0, r: 0 }, hist = [];
-    const reset = (down) => {
-      st = { t: 0, x: 0, xd: 0, th: down ? Math.PI - 0.05 : 0.12, thd: 0, F: 0, status: 'ok', bal: 0, best: st ? st.best : 0, ctrlOn: true, swing: false, Fq: [] };
-      hist = []; charts.forEach(c => c.clear());
-    };
-    const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
-
-    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/7.5' }); S.left.append(vis); const cv = CL.canvasIn(vis);
-    const pl = el('div', { class: 'plots two' }); S.left.append(pl);
-    const cTh = new CL.Chart(pl, { title: 'Pole angle from upright', yUnit: 'deg', window: 15, minSpan: 10, zero: true, height: 140, series: [{ name: 'θ', color: '--sys' }] });
-    const cX = new CL.Chart(pl, { title: 'Cart position', yUnit: 'm', window: 15, minSpan: 1, zero: true, height: 140, series: [{ name: 'x', color: '--sys' }, { name: 'target', color: '--ok', dash: [6, 4] }] });
-    const cF = new CL.Chart(pl, { title: 'Control force', yUnit: 'N', window: 15, minSpan: 10, zero: true, height: 140, series: [{ name: 'u', color: '--ctl' }] });
-    const cV = new CL.Chart(pl, { title: 'Lyapunov function V = xᵀPx', yUnit: '', window: 15, minSpan: .5, yMin: 0, height: 140, series: [{ name: 'V', color: '--ai' }] });
-    const charts = [cTh, cX, cF, cV];
-
-    const tl = CL.card(S.right, 'Status');
-    const T = CL.tiles(tl, [['st', 'State', '--ok'], ['bal', 'Balanced for', '--sys'], ['best', 'Best (manual)', '--ctl']]);
-
-    const mc = CL.card(S.right, 'Who is in control?');
-    const mode = CL.seg(mc, { options: [['auto', 'Feedback controller'], ['manual', 'You'], ['off', 'Nobody']], value: 'auto', onChange: v => { if (v === 'manual') { reset(false); st.th = 0.03; } } });
-    const manHint = el('div', { class: 'muted', style: 'font-size:.85rem' }, ['Hold ', el('span', { class: 'kbd' }, '←'), ' / ', el('span', { class: 'kbd' }, '→'), ' or the buttons below to push the cart.']); mc.append(manHint);
-    const mb = el('div', { class: 'btns', style: 'margin-top:6px' }); mc.append(mb);
-    const hold = (b, k) => { const on = e => { e.preventDefault(); keys[k] = 1; }, off = () => { keys[k] = 0; }; b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); };
-    hold(CL.button(mb, '◀ push left', () => { }), 'l'); hold(CL.button(mb, 'push right ▶', () => { }), 'r');
-    const swing = CL.check(mc, 'Energy-based swing-up when the pole is down (nonlinear)', true);
-
-    const kc = CL.card(S.right, 'State-feedback gains'); kc.append(CL.el('div', { class: 'eq', style: 'margin-bottom:6px' }, 'u = Kθ·θ + Kω·ω + Kx·(x − x*) + Kv·v'));
-    const kth = CL.slider(kc, { label: 'Kθ  angle', min: 0, max: 150, step: .5, value: 73.5, dec: 1, color: '--ctl' });
-    const kw = CL.slider(kc, { label: 'Kω  angular velocity', min: 0, max: 30, step: .1, value: 14.8, dec: 1, color: '--ctl' });
-    const kx = CL.slider(kc, { label: 'Kx  cart position', min: 0, max: 30, step: .1, value: 10, dec: 1, color: '--ctl' });
-    const kv = CL.slider(kc, { label: 'Kv  cart velocity', min: 0, max: 30, step: .1, value: 11.8, dec: 1, color: '--ctl' });
-    const pr = el('div', { class: 'btns' }); kc.append(pr);
-    const preset = (a, b2, c, d) => () => { mode.set('auto'); kth.set(a); kw.set(b2); kx.set(c); kv.set(d); };
-    CL.button(pr, 'LQR (optimal)', preset(73.5, 14.8, 10, 11.8), 'pri'); CL.button(pr, 'Angle only', preset(73.5, 14.8, 0, 0)); CL.button(pr, 'Too weak', preset(10, 3, 0, 0), 'warn'); CL.button(pr, 'Over-damped', preset(40, 30, 3, 8));
-
-    const dc = CL.card(S.right, 'Reality check: disturbances and uncertainty');
-    const xt = CL.slider(dc, { label: 'Target cart position x*', min: -1.5, max: 1.5, step: .1, value: 0, dec: 1, unit: 'm', color: '--ok' });
-    const fmax = CL.slider(dc, { label: 'Motor force limit', min: 5, max: 80, step: 1, value: 40, unit: 'N', color: '--err' });
-    const nz = CL.slider(dc, { label: 'Angle sensor noise', min: 0, max: 3, step: .1, value: 0, dec: 1, unit: 'deg', color: '--err' });
-    const dly = CL.slider(dc, { label: 'Control delay', min: 0, max: 120, step: 5, value: 0, unit: 'ms', color: '--err' });
-    const mp = CL.slider(dc, { label: 'Real pole mass (controller assumes 0.2 kg)', min: .05, max: 1.2, step: .05, value: .2, dec: 2, unit: 'kg', color: '--err' });
-    const wind = CL.slider(dc, { label: 'Random push (wind)', min: 0, max: 6, step: .5, value: 0, dec: 1, unit: 'N', color: '--err' });
-    const db = el('div', { class: 'btns' }); dc.append(db);
-    CL.button(db, '👉 Tap the pole', () => { st.thd += (Math.random() < .5 ? -1 : 1) * 1.6; }, 'warn');
-    CL.button(db, 'Start hanging down', () => reset(true));
-    CL.button(db, 'Start upright', () => reset(false));
-
-    const ex = CL.card(S.right, 'What you are seeing', 'explain'); const exT = el('div'); ex.append(exT);
-    CL.guide(S.right, [
-      { title: 'Nobody in control', text: 'Choose <b>Nobody</b>. Upright is an <b>equilibrium</b> (forces balance), but an <b>unstable</b> one: the tiniest tilt grows. Where does the pole end up? Hanging down is the stable equilibrium.', setup: () => { mode.set('off'); reset(false); } },
-      { title: 'You are the controller', text: 'Choose <b>You</b> and keep the pole up with the arrow keys. You will find yourself moving the cart <i>under</i> the falling pole, just as you move your hand under a balanced broomstick.', setup: () => { mode.set('manual'); } },
-      { title: 'Angle feedback only', text: 'Press <b>Angle only</b>. The pole stays up, but the cart drifts and eventually hits the end of the track. Stabilising one variable is not enough: the controller must watch the <b>whole state</b>.', setup: () => { preset(73.5, 14.8, 0, 0)(); reset(false); } },
-      { title: 'Full state feedback (LQR)', text: 'Press <b>LQR</b>. Now the pole stays up <i>and</i> the cart returns to x*. Move the target slider: notice the cart first moves the <i>wrong</i> way to tilt the pole in the direction it wants to travel. V(x) keeps decreasing — that is a Lyapunov certificate.', setup: () => { preset(73.5, 14.8, 10, 11.8)(); reset(false); } },
-      { title: 'Robustness test', text: 'Increase the real pole mass, add noise, a 60 ms delay and wind. Linear LQR tolerates a surprising amount — until it does not. Robust control asks: <i>how much uncertainty can we guarantee to survive?</i>', setup: () => { mp.set(.5); nz.set(1); dly.set(60); wind.set(2); } },
-      { title: 'Nonlinear: swing-up', text: 'Press <b>Start hanging down</b>. A linear controller is useless 180° away from upright. A nonlinear energy-pumping law swings the pole up, then hands over to LQR near the top. This is a hybrid nonlinear controller.', setup: () => { mp.set(.2); nz.set(0); dly.set(0); wind.set(0); preset(73.5, 14.8, 10, 11.8)(); swing.set(true); reset(true); } },
-    ]);
-    S.resetB.onclick = () => reset(false); reset(false);
-    const kd = e => { if (e.key === 'ArrowLeft') { keys.l = 1; e.preventDefault(); } if (e.key === 'ArrowRight') { keys.r = 1; e.preventDefault(); } };
-    const ku = e => { if (e.key === 'ArrowLeft') keys.l = 0; if (e.key === 'ArrowRight') keys.r = 0; };
-    window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
-    cv.cv.addEventListener('pointerdown', e => { const r = cv.cv.getBoundingClientRect(); const px = e.clientX - r.left; st.thd += (px < geo.bx ? -1 : 1) * 1.4; });
-
-    function deriv(s, F, m, L) {
-      const sn = Math.sin(s.th), cs = Math.cos(s.th);
-      const xdd = (F - b * s.xd + m * L * s.thd * s.thd * sn - m * g * sn * cs) / (Mc + m * sn * sn);
-      const thdd = (g * sn - xdd * cs) / L - 0.02 * s.thd;
-      return [s.xd, xdd, s.thd, thdd];
-    }
-    function controller() {
-      const thm = wrap(st.th) + nz.get() * Math.PI / 180 * randn();
-      const m = mNom, L = LNom;
-      if (mode.get() === 'off') return 0;
-      if (mode.get() === 'manual') return (keys.r - keys.l) * 15;
-      const near = Math.abs(thm) < 0.6;
-      if (!near) {
-        st.swing = swing.get();
-        if (!swing.get()) return 0;
-        const E = 0.5 * m * L * L * st.thd * st.thd + m * g * L * (Math.cos(thm) - 1);
-        let a = clamp(30 * E * Math.sign(st.thd * Math.cos(thm) || 1), -7, 7) - 2.0 * (st.x - 0) - 2.5 * st.xd;
-        if (Math.abs(E) < 0.01 && Math.abs(thm) > 2.9 && Math.abs(st.thd) < 0.05) a = 6; // kick if resting at the bottom
-        const sn = Math.sin(thm), cs = Math.cos(thm);
-        return (Mc + m * sn * sn) * a + b * st.xd - m * L * st.thd * st.thd * sn + m * g * sn * cs;
+    const S = gameShell(root, back, { title: this.title, subtitle: 'You are the controller. Your skin is the sensor. The tap is the actuator.', color: this.color });
+    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/7' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots' }); S.left.append(pl);
+    const ch = new CL.Chart(pl, { title: 'Water temperature at your head', yUnit: '°C', window: 60, yMin: 20, yMax: 55, series: [{ name: 'Temperature', color: '--sys' }, { name: 'Tap setting (scaled)', color: '--ctl', dash: [4, 3], dec: 0, noscale: true }] });
+    ch.extra = [{ y: 40, color: '--ok', label: '' }, { y: 37, color: '--ok', label: 'comfort band' }];
+    const c1 = CL.card(S.right, 'Your controls');
+    const tap = CL.slider(c1, { label: 'Tap: cold ← → hot', min: 0, max: 100, step: 1, value: 30, unit: '% hot', color: '--ctl' });
+    c1.append(el('div', { class: 'muted', style: 'font-size:.85rem' }, ['Keyboard: ', el('span', { class: 'kbd' }, '←'), ' colder, ', el('span', { class: 'kbd' }, '→'), ' hotter']));
+    const mode = CL.seg(c1, { label: 'Who controls the tap?', options: [['you', 'You'], ['pi', 'Controller (PI)']], value: 'you' });
+    const lag = CL.slider(c1, { label: 'Pipe delay', min: 0, max: 5, step: .5, value: 2, dec: 1, unit: 's', color: '--err' });
+    const bb = el('div', { class: 'btns' }); c1.append(bb);
+    CL.button(bb, '▶ Start 60-second round', () => reset(true), 'pri');
+    const c2 = CL.card(S.right, 'Score');
+    const T = CL.tiles(c2, [['time', 'Time left', '--sys'], ['in', 'In comfort band', '--ok'], ['best', 'Best (you)', '--ctl']]);
+    const ex = CL.card(S.right, 'Think about it', 'explain');
+    ex.innerHTML += '<p>Why do people overshoot when adjusting a shower? What would happen with a 5-second delay? What does the controller do differently from you?</p><p class="muted">Concept: closed-loop feedback, delay, overshoot and oscillation. In a real shower, the delay is the time water takes to travel through the pipe.</p>';
+    let st, best = 0, events = [];
+    function reset(run) { st = { t: 0, T: 30, q: [], inb: 0, run, I: 0, done: false }; ch.clear(); events = [[12 + Math.random() * 6, 'Someone flushed the toilet! (less cold water)', 9], [32 + Math.random() * 6, 'Boiler hiccup (water cooler)', -10], [48 + Math.random() * 5, 'Flush again!', 8]]; }
+    reset(false);
+    S.resetB.onclick = () => reset(false);
+    const kd = e => { if (e.key === 'ArrowLeft') tap.set(clamp(tap.get() - 3, 0, 100)); if (e.key === 'ArrowRight') tap.set(clamp(tap.get() + 3, 0, 100)); };
+    window.addEventListener('keydown', kd);
+    let dist = 0, msg = '', msgT = 0;
+    const dt = 0.02;
+    let acc = 0; const L = CL.loop((rdt, paused) => {
+      if (!paused) for (acc += rdt; acc >= dt; acc -= dt) {
+        if (st.run && !st.done) {
+          events.forEach(ev => { if (!ev.fired && st.t >= ev[0]) { ev.fired = true; dist += ev[2]; msg = ev[1]; msgT = 3; } });
+        }
+        dist *= (1 - dt / 8);
+        if (mode.get() === 'pi') { const e = 38.5 - st.T; st.I += e * dt; tap.set(clamp(30 + 2.2 * e + 0.6 * st.I, 0, 100)); }
+        const mix = 15 + tap.get() / 100 * 45 + dist;
+        st.q.push(mix); const nd = Math.round(lag.get() / dt); while (st.q.length > nd + 1) st.q.shift();
+        st.T += (st.q[0] - st.T) * dt / 0.6;
+        st.t += dt; msgT -= dt;
+        if (st.run && !st.done) { if (st.T >= 37 && st.T <= 40) st.inb += dt; if (st.t >= 60) { st.done = true; if (mode.get() === 'you') best = Math.max(best, st.inb / 60 * 100); } }
       }
-      st.swing = false;
-      return kth.get() * thm + kw.get() * st.thd + kx.get() * (st.x - xt.get()) + kv.get() * st.xd;
-    }
-    const dt = 0.002; let wnd = 0;
-    function step() {
-      let F = clamp(controller(), -fmax.get(), fmax.get());
-      st.Fq.push(F); const nd = Math.round(dly.get() / 1000 / dt); while (st.Fq.length > nd + 1) st.Fq.shift(); F = st.Fq[0];
-      st.F = F;
-      wnd += (wind.get() * randn() * 3 - wnd) * dt / 0.3;
-      const m = mp.get(), L = LNom, Ft = F + wnd;
-      const s = st, k1 = deriv(s, Ft, m, L);
-      const s2 = { x: s.x + k1[0] * dt / 2, xd: s.xd + k1[1] * dt / 2, th: s.th + k1[2] * dt / 2, thd: s.thd + k1[3] * dt / 2 }, k2 = deriv(s2, Ft, m, L);
-      const s3 = { x: s.x + k2[0] * dt / 2, xd: s.xd + k2[1] * dt / 2, th: s.th + k2[2] * dt / 2, thd: s.thd + k2[3] * dt / 2 }, k3 = deriv(s3, Ft, m, L);
-      const s4 = { x: s.x + k3[0] * dt, xd: s.xd + k3[1] * dt, th: s.th + k3[2] * dt, thd: s.thd + k3[3] * dt }, k4 = deriv(s4, Ft, m, L);
-      s.x += dt / 6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]); s.xd += dt / 6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
-      s.th += dt / 6 * (k1[2] + 2 * k2[2] + 2 * k3[2] + k4[2]); s.thd += dt / 6 * (k1[3] + 2 * k2[3] + 2 * k3[3] + k4[3]);
-      if (Math.abs(s.x) > TRACK) { s.x = Math.sign(s.x) * TRACK; s.xd = -0.2 * s.xd; s.thd += 0; s.status = 'crash'; s.crashT = s.t; }
-      st.t += dt;
-      const up = Math.abs(wrap(st.th)) < 0.35;
-      if (up) { st.bal += dt; if (mode.get() === 'manual') st.best = Math.max(st.best, st.bal); } else st.bal = 0;
-      st.status = s.crashT != null && s.t - s.crashT < 1 ? 'crash' : up ? 'ok' : st.swing ? 'swing' : 'fall';
-    }
-    let acc = 0, pushT = -1;
-    const L = CL.loop((rdt, paused) => {
-      if (!paused) { acc += rdt; let n = 0; while (acc >= dt && n++ < 60) { step(); acc -= dt; } if (n >= 60) acc = 0; }
-      if (st.t - pushT >= 0.03) {
-        pushT = st.t; const th = wrap(st.th);
-        const xv = [st.x - xt.get(), st.xd, th, st.thd]; let V = 0; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) V += xv[i] * Pm[i][j] * xv[j];
-        cTh.push(st.t, [th * 180 / Math.PI]); cX.push(st.t, [st.x, xt.get()]); cF.push(st.t, [st.F]); cV.push(st.t, [Math.abs(th) < 0.6 ? V : null]);
-        hist.push([th, st.thd]); if (hist.length > 400) hist.shift();
-      }
-      charts.forEach(c => c.draw()); draw(); explain();
+      ch.push(st.t, [st.T, 20 + tap.get() * .35]); ch.draw(); draw();
+      T.set('time', st.run ? Math.max(0, 60 - st.t).toFixed(0) + ' s' : '—'); T.set('in', st.run ? (st.inb / Math.min(60, Math.max(st.t, .01)) * 100).toFixed(0) + ' %' : '—'); T.set('best', best.toFixed(0) + ' %');
     }, S.pauseB);
-    const geo = { bx: 0 };
     function draw() {
       const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
-      const pw = w > 700 ? w * 0.72 : w; const sc = (pw - 60) / (2 * TRACK + 0.6); const cx0 = 30 + (TRACK + 0.3) * sc; const ty = h * 0.78;
-      // rails
-      ctx.strokeStyle = css('--muted'); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(cx0 - (TRACK + .2) * sc, ty); ctx.lineTo(cx0 + (TRACK + .2) * sc, ty); ctx.stroke();
-      ctx.fillStyle = css('--err'); [-1, 1].forEach(sg => ctx.fillRect(cx0 + sg * (TRACK + .2) * sc - 5, ty - 30, 10, 34));
-      ctx.fillStyle = css('--ok'); ctx.beginPath(); ctx.moveTo(cx0 + xt.get() * sc, ty + 6); ctx.lineTo(cx0 + xt.get() * sc - 8, ty + 20); ctx.lineTo(cx0 + xt.get() * sc + 8, ty + 20); ctx.fill();
-      ctx.font = '11px Inter'; ctx.textAlign = 'center'; ctx.fillText('x*', cx0 + xt.get() * sc, ty + 33);
-      const bx = cx0 + st.x * sc; geo.bx = bx;
-      const sz = Math.max(40, sc * 0.35);
-      ctx.fillStyle = css('--sys'); CL.rrect(ctx, bx - sz / 2, ty - sz * .55, sz, sz * .5, 6); ctx.fill();
-      ctx.fillStyle = '#111'; [-1, 1].forEach(sg => { ctx.beginPath(); ctx.arc(bx + sg * sz * .3, ty - 4, 6, 0, 7); ctx.fill(); });
-      const pivY = ty - sz * .55; const Lp = Math.min(h * 0.62, sc * 1.1);
-      const px = bx + Lp * Math.sin(st.th), py = pivY - Lp * Math.cos(st.th);
-      const col = st.status === 'ok' ? css('--sys') : st.status === 'swing' ? css('--ai') : css('--err');
-      ctx.strokeStyle = col; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(bx, pivY); ctx.lineTo(px, py); ctx.stroke();
-      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, py, 6 + 10 * Math.sqrt(mp.get() / .2) * .8, 0, 7); ctx.fill();
-      ctx.strokeStyle = CL.alpha(css('--ok'), .5); ctx.setLineDash([4, 5]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bx, pivY); ctx.lineTo(bx, pivY - Lp); ctx.stroke(); ctx.setLineDash([]);
-      // force arrow
-      const fa = st.F / 40 * sc * 0.8; if (Math.abs(fa) > 3) CL.arrow(ctx, bx + Math.sign(fa) * sz / 2, ty - sz * .3, bx + Math.sign(fa) * sz / 2 + fa, ty - sz * .3, css('--ctl'), 5);
-      if (Math.abs(wnd) > .3) CL.arrow(ctx, bx - wnd * 8, ty - sz * .8, bx, ty - sz * .8, CL.alpha(css('--err'), .8), 2);
-      ctx.textAlign = 'left'; ctx.font = '700 18px "Space Grotesk",Inter'; ctx.fillStyle = col;
-      const lab = { ok: 'BALANCED', fall: mode.get() === 'auto' && !swing.get() ? 'OUTSIDE REGION OF ATTRACTION – controller off' : 'FALLING / DOWN', swing: 'SWINGING UP (energy control)', crash: 'HIT THE END STOP' }[st.status];
-      ctx.fillText(lab, 14, 28);
-      ctx.font = '13px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText(`θ = ${(wrap(st.th) * 180 / Math.PI).toFixed(1)}°   x = ${st.x.toFixed(2)} m   u = ${st.F.toFixed(1)} N`, 14, 48);
-      if (mode.get() === 'manual') { ctx.fillStyle = css('--ctl'); ctx.fillText('You are the controller: ← →  (click the scene to tap the pole)', 14, 68); }
-      // phase portrait
-      if (w > 700) {
-        const ox = w * 0.74, ow = w * 0.24, oy = 16, oh = h - 40; ctx.fillStyle = css('--panel'); CL.rrect(ctx, ox, oy, ow, oh, 10); ctx.fill();
-        ctx.fillStyle = css('--muted'); ctx.font = '600 12px Inter'; ctx.fillText('Phase portrait (θ, ω)', ox + 10, oy + 18);
-        const cxp = ox + ow / 2, cyp = oy + oh / 2 + 8, sx = ow / 2 / 0.8, sy = (oh / 2 - 20) / 4;
-        ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ox + 6, cyp); ctx.lineTo(ox + ow - 6, cyp); ctx.moveTo(cxp, oy + 26); ctx.lineTo(cxp, oy + oh - 6); ctx.stroke();
-        ctx.fillStyle = css('--ok'); ctx.beginPath(); ctx.arc(cxp, cyp, 5, 0, 7); ctx.fill(); ctx.font = '11px Inter'; ctx.fillText('goal', cxp + 7, cyp - 6);
-        ctx.save(); ctx.beginPath(); ctx.rect(ox, oy + 22, ow, oh - 22); ctx.clip();
-        ctx.strokeStyle = css('--sys'); ctx.lineWidth = 1.5; ctx.beginPath();
-        hist.forEach((p, i) => { const X = cxp + p[0] * sx, Y = cyp - p[1] * sy; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.stroke();
-        const lp = hist[hist.length - 1]; if (lp) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cxp + lp[0] * sx, cyp - lp[1] * sy, 5, 0, 7); ctx.fill(); }
-        ctx.restore(); ctx.fillStyle = css('--muted'); ctx.fillText('θ →', ox + ow - 30, cyp + 14); ctx.fillText('ω ↑', cxp + 4, oy + 34);
-      }
+      const cx = w * .35, top = h * .12;
+      ctx.strokeStyle = css('--muted'); ctx.lineWidth = 10; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(cx - 160, h * .8); ctx.lineTo(cx - 160, top); ctx.lineTo(cx, top); ctx.lineTo(cx, top + 30); ctx.stroke();
+      // pipe colour segments (delay visual)
+      const n = st.q.length; for (let i = 0; i < 20; i++) { const v = st.q[Math.floor((1 - i / 20) * (n - 1))] ?? st.T; const f = clamp((v - 15) / 45, 0, 1); ctx.strokeStyle = `rgb(${Math.round(59 + 180 * f)},${Math.round(130 - 62 * f)},${Math.round(246 - 178 * f)})`; ctx.lineWidth = 6; const y0 = h * .8 - i * (h * .8 - top) / 20; ctx.beginPath(); ctx.moveTo(cx - 160, y0); ctx.lineTo(cx - 160, y0 - (h * .8 - top) / 20); ctx.stroke(); }
+      ctx.fillStyle = css('--muted'); ctx.fillRect(cx - 40, top + 30, 80, 14);
+      const f = clamp((st.T - 15) / 45, 0, 1); const col = `rgb(${Math.round(59 + 180 * f)},${Math.round(130 - 62 * f)},${Math.round(246 - 178 * f)})`;
+      for (let i = 0; i < 26; i++) { ctx.strokeStyle = CL.alpha('#ffffff', .0) ; ctx.fillStyle = col; const x = cx - 34 + (i % 13) * 5.5 + Math.sin(st.t * 9 + i) * 3, y = top + 50 + ((st.t * 260 + i * 37) % (h * .55)); ctx.fillRect(x, y, 2.5, 9); }
+      // person (simple)
+      const px = cx, py = h * .62; ctx.fillStyle = css('--panel'); ctx.strokeStyle = css('--ink'); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(px, py - 40, 22, 0, 7); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(px, py - 18); ctx.lineTo(px, py + 50); ctx.stroke();
+      const face = st.T > 40 ? '🥵' : st.T < 37 ? '🥶' : '😊'; ctx.font = '30px serif'; ctx.textAlign = 'center'; ctx.fillText(face, px, py - 30);
+      // tap knob
+      const kx = cx - 160, ky = h * .62; ctx.fillStyle = css('--panel2'); ctx.beginPath(); ctx.arc(kx, ky, 26, 0, 7); ctx.fill();
+      const a = -Math.PI * .75 + tap.get() / 100 * Math.PI * 1.5; CL.arrow(ctx, kx, ky, kx + 24 * Math.cos(a - Math.PI / 2), ky + 24 * Math.sin(a - Math.PI / 2), css('--ctl'), 4);
+      ctx.font = '600 12px Inter'; ctx.fillStyle = css('--sys'); ctx.fillText('cold', kx - 36, ky + 42); ctx.fillStyle = css('--err'); ctx.fillText('hot', kx + 36, ky + 42);
+      ctx.textAlign = 'left'; ctx.font = '700 34px "Space Grotesk",Inter'; ctx.fillStyle = st.T >= 37 && st.T <= 40 ? css('--ok') : css('--err'); ctx.fillText(st.T.toFixed(1) + ' °C', w * .62, h * .35);
+      ctx.font = '14px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText('target 37–40 °C', w * .62, h * .35 + 24);
+      if (msgT > 0) { ctx.fillStyle = css('--err'); ctx.font = '700 16px Inter'; ctx.fillText('⚠ ' + msg, w * .52, h * .65); }
+      if (st.done) { ctx.fillStyle = css('--ok'); ctx.font = '700 20px Inter'; ctx.fillText(`Round over: ${(st.inb / 60 * 100).toFixed(0)} % of the time comfortable`, w * .45, h * .85); }
+      else if (!st.run) { ctx.fillStyle = css('--ctl'); ctx.font = '600 15px Inter'; ctx.fillText('Practise freely, or press “Start 60-second round”.', w * .45, h * .85); }
     }
-    let lastEx = 0;
-    function explain() {
-      if (performance.now() - lastEx < 400) return; lastEx = performance.now();
-      const lab = { ok: 'Balanced', fall: 'Down', swing: 'Swing-up', crash: 'Crashed' }[st.status];
-      T.set('st', lab); T.color('st', st.status === 'ok' ? '--ok' : st.status === 'swing' ? '--ai' : '--err'); T.set('bal', st.bal.toFixed(1) + ' s'); T.set('best', st.best.toFixed(1) + ' s');
-      const m = [], md = mode.get();
-      if (md === 'off') m.push('No control: the upright equilibrium is unstable, so gravity wins and the pole falls to the stable hanging position.');
-      if (md === 'manual') m.push('Your brain is closing the loop: eyes are the sensor, your fingers the actuator. Your reaction time (~0.2 s) is a delay, which is why this is hard.');
-      if (md === 'auto') {
-        if (st.status === 'ok' && kx.get() === 0 && kv.get() === 0) m.push('The angle is stabilised, but nothing controls the cart position, so the cart drifts. Part of the state is uncontrolled.');
-        else if (st.status === 'ok') m.push(`Every ${(dt * 1000).toFixed(0)} ms the controller measures the full state and sets u = K·x. The purple V(x) curve going down shows the system losing “error energy”: a Lyapunov function.`);
-        if (kth.get() < (Mc + mp.get()) * g && kth.get() > 0) m.push(`Kθ is below (M+m)·g ≈ ${((Mc + mp.get()) * g).toFixed(1)} N/rad: the controller cannot push hard enough to beat gravity, whatever the other gains are.`);
-        if (st.status === 'swing') m.push('Far from upright, a nonlinear law pumps energy into the pole (like pumping a swing). Near the top it hands over to the linear LQR controller.');
-        if (Math.abs(st.F) >= fmax.get() - .01) m.push('<span style="color:var(--err)">Motor at its force limit (saturation).</span>');
-        if (mp.get() !== .2) m.push(`The real pole is ${mp.get()} kg but the gains were designed for 0.2 kg. Feedback gives robustness, within limits.`);
+    return { stop: () => { L.stop(); window.removeEventListener('keydown', kd); } };
+  }
+};
+
+APPS['game-drone'] = {
+  title: 'Game: Hover the Drone', concept: 'Stability and disturbance rejection', audience: 'School (Class 8–12)', color: '--sys', game: true,
+  blurb: 'Hold the thrust button to fly a delivery drone through moving altitude gates while gusts push it around. Then switch on the autopilot.',
+  mount(root, back) {
+    const { css, clamp, el, randn } = CL;
+    const S = gameShell(root, back, { title: this.title, subtitle: 'Thrust fights gravity. Too little and you fall; too much and you overshoot.', color: this.color });
+    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/8;user-select:none' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots' }); S.left.append(pl);
+    const ch = new CL.Chart(pl, { title: 'Altitude', yUnit: 'm', window: 30, yMin: 0, yMax: 12, series: [{ name: 'Gate centre', color: '--ok', dash: [6, 4] }, { name: 'Drone', color: '--sys' }] });
+    const c1 = CL.card(S.right, 'Controls');
+    const thr = el('button', { class: 'b pri', style: 'width:100%;padding:18px;font-size:1.1rem;touch-action:none' }, '⬆ HOLD FOR THRUST  (or Space)'); c1.append(thr);
+    let hold = 0; thr.addEventListener('pointerdown', e => { e.preventDefault(); hold = 1; }); ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => thr.addEventListener(ev, () => hold = 0));
+    const kd = e => { if (e.code === 'Space') { hold = 1; e.preventDefault(); } }, ku = e => { if (e.code === 'Space') hold = 0; };
+    window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
+    const mode = CL.seg(c1, { label: 'Pilot', options: [['you', 'You'], ['pd', 'Autopilot (PD)'], ['pid', 'Autopilot (PID)']], value: 'you' });
+    const gust = CL.slider(c1, { label: 'Wind gusts', min: 0, max: 6, step: .5, value: 2, dec: 1, color: '--err' });
+    const pay = CL.slider(c1, { label: 'Parcel mass', min: 0, max: 1.5, step: .1, value: 0, dec: 1, unit: 'kg', color: '--err', hint: 'The autopilot was tuned for an empty drone.' });
+    const bb = el('div', { class: 'btns' }); c1.append(bb); CL.button(bb, '▶ Start 45-second round', () => reset(true), 'pri');
+    const c2 = CL.card(S.right, 'Score'); const T = CL.tiles(c2, [['t', 'Time left', '--sys'], ['in', 'Inside gates', '--ok'], ['best', 'Best (you)', '--ctl']]);
+    const ex = CL.card(S.right, 'Think about it', 'explain');
+    ex.innerHTML += '<p>Why does the PD autopilot hover slightly below the gate when carrying a parcel? Why does adding I (PID) fix it? Is the drone stable if nobody controls it?</p><p class="muted">Concept: unstable open-loop behaviour, feedback stabilisation, steady-state error and integral action.</p>';
+    let st, best = 0;
+    function target(t) { return 5 + 3 * Math.sin(t / 6) + 1.5 * Math.sin(t / 2.3 + 1); }
+    function reset(run) { st = { t: 0, z: 4, v: 0, run, inb: 0, done: false, I: 0, wind: 0, u: 0 }; ch.clear(); }
+    reset(false); S.resetB.onclick = () => reset(false);
+    const dt = 0.01, g = 9.81, m0 = 1.2, Tmax = 2.1 * m0 * g;
+    let acc = 0; const L = CL.loop((rdt, paused) => {
+      if (!paused) for (acc += rdt; acc >= dt; acc -= dt) {
+        const m = m0 + pay.get(), r = target(st.t);
+        let u;
+        if (mode.get() === 'you') u = hold;
+        else { const e = r - st.z; if (mode.get() === 'pid') st.I = clamp(st.I + e * dt, -10, 10); else st.I = 0; u = clamp((m0 * g + m0 * (6 * e - 4 * st.v + (mode.get() === 'pid' ? 4 * st.I : 0))) / Tmax, 0, 1); }
+        st.u += (u - st.u) * dt / 0.08;
+        st.wind += (gust.get() * randn() * 2.5 - st.wind) * dt / 0.6;
+        const a = (st.u * Tmax + st.wind) / m - g - 0.3 * st.v;
+        st.v += a * dt; st.z += st.v * dt; if (st.z < 0) { st.z = 0; st.v = Math.max(0, st.v); } if (st.z > 12) { st.z = 12; st.v = Math.min(0, st.v); }
+        st.t += dt;
+        if (st.run && !st.done) { if (Math.abs(st.z - r) < 0.8) st.inb += dt; if (st.t >= 45) { st.done = true; if (mode.get() === 'you') best = Math.max(best, st.inb / 45 * 100); } }
       }
-      exT.innerHTML = m.map(s => `<p>${s}</p>`).join('');
+      ch.push(st.t, [target(st.t), st.z]); ch.draw(); draw();
+      T.set('t', st.run ? Math.max(0, 45 - st.t).toFixed(0) + ' s' : '—'); T.set('in', st.run ? (st.inb / Math.min(45, Math.max(.01, st.t)) * 100).toFixed(0) + ' %' : '—'); T.set('best', best.toFixed(0) + ' %');
+    }, S.pauseB);
+    function draw() {
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
+      const Y = z => h - 20 - z / 12 * (h - 40), sx = 40; // px per second ahead
+      const x0 = w * .3;
+      ctx.fillStyle = CL.alpha(css('--muted'), .3); ctx.fillRect(0, h - 20, w, 20);
+      // gates ahead
+      for (let tt = Math.ceil(st.t) - 8; tt < st.t + (w - x0) / sx; tt += 2) {
+        const x = x0 + (tt - st.t) * sx, r = target(tt); ctx.strokeStyle = CL.alpha(css('--ok'), .7); ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(x, Y(r + .8)); ctx.lineTo(x, Y(r + .8) - 10); ctx.moveTo(x, Y(r - .8)); ctx.lineTo(x, Y(r - .8) + 10); ctx.stroke();
+        ctx.fillStyle = CL.alpha(css('--ok'), .12); ctx.fillRect(x - 3, Y(r + .8), 6, Y(r - .8) - Y(r + .8));
+      }
+      const zx = x0, zy = Y(st.z), inb = Math.abs(st.z - target(st.t)) < .8;
+      ctx.save(); ctx.translate(zx, zy); ctx.rotate(st.wind * 0.03);
+      ctx.fillStyle = inb ? css('--sys') : css('--err'); CL.rrect(ctx, -30, -8, 60, 16, 6); ctx.fill();
+      ctx.strokeStyle = css('--ink'); ctx.lineWidth = 3; [-38, 38].forEach(px => { ctx.beginPath(); ctx.moveTo(px - 16, -14); ctx.lineTo(px + 16, -14); ctx.stroke(); ctx.beginPath(); ctx.moveTo(px, -8); ctx.lineTo(px, -14); ctx.stroke(); });
+      if (pay.get() > 0) { ctx.fillStyle = '#b5835a'; ctx.fillRect(-12, 10, 24, 16 + pay.get() * 6); }
+      ctx.restore();
+      if (st.u > .05) CL.arrow(ctx, zx, zy - 20, zx, zy - 20 - st.u * 60, css('--ctl'), 4);
+      CL.arrow(ctx, zx + 50, zy, zx + 50, zy + 40, css('--err'), 3, ''); ctx.fillStyle = css('--err'); ctx.font = '11px Inter'; ctx.fillText('gravity', zx + 56, zy + 30);
+      if (Math.abs(st.wind) > 1) { CL.arrow(ctx, zx - 70, zy, zx - 70, zy - st.wind * 6, CL.alpha(css('--err'), .7), 3); }
+      ctx.font = '700 18px "Space Grotesk",Inter'; ctx.textAlign = 'left'; ctx.fillStyle = css('--ink'); ctx.fillText(`altitude ${st.z.toFixed(1)} m`, 14, 28);
+      if (st.done) { ctx.fillStyle = css('--ok'); ctx.font = '700 20px Inter'; ctx.fillText(`Round over: inside the gates ${(st.inb / 45 * 100).toFixed(0)} % of the time`, 14, 56); }
     }
     return { stop: () => { L.stop(); window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); } };
   }
 };
 
-CL.initTheme(); APPS['pendulum'].mount(document.getElementById('root'), false);</script>
+APPS['game-traffic'] = {
+  title: 'Game: The Traffic Controller', concept: 'Feedback vs fixed schedules', audience: 'School (Class 8–12)', color: '--err', game: true,
+  blurb: 'Run a busy junction. Switch the lights yourself, then compare a fixed timer with a feedback controller that counts the queues.',
+  mount(root, back) {
+    const { css, clamp, el } = CL;
+    const S = gameShell(root, back, { title: this.title, subtitle: 'Sensor = queue length, actuator = traffic light, objective = least total waiting time', color: this.color });
+    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/8' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots' }); S.left.append(pl);
+    const ch = new CL.Chart(pl, { title: 'Queue lengths', yUnit: 'cars', window: 120, minSpan: 6, yMin: 0, series: [{ name: 'North–South', color: '--sys' }, { name: 'East–West', color: '--ctl' }] });
+    const c1 = CL.card(S.right, 'Controls');
+    const swB = el('button', { class: 'b pri', style: 'width:100%;padding:16px;font-size:1.05rem' }, '🚦 SWITCH LIGHTS  (or Space)'); c1.append(swB);
+    const mode = CL.seg(c1, { label: 'Who runs the signal?', options: [['you', 'You'], ['timer', 'Fixed timer'], ['fb', 'Feedback']], value: 'you' });
+    const rNS = CL.slider(c1, { label: 'North–South traffic', min: 2, max: 30, step: 1, value: 18, unit: 'cars/min', color: '--sys' });
+    const rEW = CL.slider(c1, { label: 'East–West traffic', min: 2, max: 30, step: 1, value: 8, unit: 'cars/min', color: '--ctl' });
+    const green = CL.slider(c1, { label: 'Fixed timer: green time', min: 5, max: 40, step: 1, value: 20, unit: 's' });
+    const bb = el('div', { class: 'btns' }); c1.append(bb); CL.button(bb, '▶ Start 2-minute round', () => reset(true), 'pri'); CL.button(bb, '🚑 Rush hour on N–S', () => rNS.set(28), 'warn');
+    const c2 = CL.card(S.right, 'Score'); const T = CL.tiles(c2, [['t', 'Time left', '--sys'], ['thr', 'Cars through', '--ok'], ['wait', 'Avg. wait', '--err'], ['best', 'Best avg. wait (you)', '--ctl']]);
+    const ex = CL.card(S.right, 'Think about it', 'explain');
+    ex.innerHTML += '<p>Why does a fixed timer waste green time when one road is empty? What does the feedback controller measure? Why must there be a minimum green time and an amber phase (safety constraint)?</p><p class="muted">Concept: open-loop schedule vs closed-loop feedback; constraints; trading off two queues.</p>';
+    let st, best = Infinity;
+    function reset(run) { st = { t: 0, phase: 0, amber: 0, since: 0, q: [[], []], passed: 0, waitSum: 0, run, done: false, acc: [0, 0], next: 0 }; ch.clear(); }
+    reset(false); S.resetB.onclick = () => reset(false);
+    const sw = () => { if (st.amber > 0 || st.since < 3) return; st.amber = 3; };
+    swB.onclick = () => { if (mode.get() === 'you') sw(); };
+    const kd = e => { if (e.code === 'Space') { e.preventDefault(); if (mode.get() === 'you') sw(); } }; window.addEventListener('keydown', kd);
+    const dt = 0.05, SPEED = 2;
+    let acc = 0; const L = CL.loop((rdt, paused) => {
+      if (!paused) for (acc += rdt * SPEED; acc >= dt; acc -= dt) {
+        [rNS.get(), rEW.get()].forEach((r, k) => { if (Math.random() < r / 60 * dt) st.q[k].push(st.t); });
+        if (st.amber > 0) { st.amber -= dt; if (st.amber <= 0) { st.phase = 1 - st.phase; st.since = 0; } }
+        else {
+          st.since += dt;
+          const g = st.phase, o = 1 - g;
+          if (st.q[g].length) { st.next -= dt; if (st.next <= 0) { const t0 = st.q[g].shift(); st.next = 1.8; if (st.run && !st.done) { st.passed++; st.waitSum += st.t - t0; } } } else st.next = 0;
+          if (mode.get() === 'timer' && st.since >= green.get()) sw();
+          if (mode.get() === 'fb' && st.since >= 6 && (st.q[o].length > st.q[g].length + 3 || (st.q[g].length === 0 && st.q[o].length > 0))) sw();
+        }
+        st.t += dt;
+        if (st.run && !st.done && st.t >= 120) { st.done = true; const aw = avgWait(); if (mode.get() === 'you') best = Math.min(best, aw); }
+      }
+      ch.push(st.t, [st.q[0].length, st.q[1].length]); ch.draw(); draw();
+      T.set('t', st.run ? Math.max(0, 120 - st.t).toFixed(0) + ' s' : '—'); T.set('thr', st.passed); T.set('wait', st.run ? avgWait().toFixed(1) + ' s' : '—'); T.set('best', isFinite(best) ? best.toFixed(1) + ' s' : '—');
+    }, S.pauseB);
+    function avgWait() { // include cars still waiting
+      let s = st.waitSum, n = st.passed; st.q.forEach(q => q.forEach(t0 => { s += st.t - t0; n++; })); return n ? s / n : 0;
+    }
+    function draw() {
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
+      const cx = w / 2, cy = h / 2, rw = Math.min(w, h) * .18;
+      ctx.fillStyle = CL.alpha(css('--muted'), .35); ctx.fillRect(cx - rw / 2, 0, rw, h); ctx.fillRect(0, cy - rw / 2, w, rw);
+      ctx.strokeStyle = css('--ink'); ctx.globalAlpha = .4; ctx.setLineDash([10, 10]); ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, h); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      const carW = 16, gap = 22;
+      st.q[0].forEach((_, i) => { ctx.fillStyle = css('--sys'); CL.rrect(ctx, cx - rw / 4 - carW / 2, cy - rw / 2 - 10 - (i + 1) * gap, carW, 18, 4); ctx.fill(); });
+      st.q[1].forEach((_, i) => { ctx.fillStyle = css('--ctl'); CL.rrect(ctx, cx + rw / 2 + 10 + i * gap, cy - rw / 4 - carW / 2, 18, carW, 4); ctx.fill(); });
+      const light = (x, y, k) => { const on = st.amber > 0 ? (st.phase === k ? 'amber' : 'red') : st.phase === k ? 'green' : 'red'; ctx.fillStyle = '#222'; CL.rrect(ctx, x - 12, y - 32, 24, 64, 6); ctx.fill(); [['red', '#ff4d4d', -20], ['amber', '#ffb020', 0], ['green', '#2ecc71', 20]].forEach(([n, c, dy]) => { ctx.fillStyle = on === n ? c : '#444'; ctx.beginPath(); ctx.arc(x, y + dy, 8, 0, 7); ctx.fill(); }); };
+      light(cx - rw / 2 - 26, cy - rw / 2 - 40, 0); light(cx + rw / 2 + 40, cy - rw / 2 - 26, 1);
+      ctx.font = '600 13px Inter'; ctx.fillStyle = css('--sys'); ctx.textAlign = 'right'; ctx.fillText(`N–S queue: ${st.q[0].length}`, cx - rw / 2 - 50, 24);
+      ctx.fillStyle = css('--ctl'); ctx.textAlign = 'left'; ctx.fillText(`E–W queue: ${st.q[1].length}`, cx + rw / 2 + 60, cy + rw / 2 + 24);
+      ctx.fillStyle = css('--muted'); ctx.fillText(`time ×${SPEED}`, 12, h - 12);
+      if (st.done) { ctx.fillStyle = css('--ok'); ctx.font = '700 18px Inter'; ctx.fillText(`Round over: ${st.passed} cars, average wait ${avgWait().toFixed(1)} s`, 12, 26); }
+    }
+    return { stop: () => { L.stop(); window.removeEventListener('keydown', kd); } };
+  }
+};
+
+CL.initTheme(); APPS['game-traffic'].mount(document.getElementById('root'), false);</script>
 <script>/* link back to the main website */
 (function () {
   var a = document.createElement('a');

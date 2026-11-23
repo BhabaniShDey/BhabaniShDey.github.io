@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Control Lab – cruise</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"><style>:root{
+<title>Inverted Pendulum · Close the Loop</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"><style>:root{
   --bg:#0b1020;--panel:#121a30;--panel2:#18223d;--ink:#e8edf7;--muted:#9aa7c2;--line:#26324f;--grid:#1d2742;
   --sys:#4da3ff;--ctl:#ff9f43;--ok:#2ecc71;--err:#ff5d5d;--ai:#b48cff;--warn:#ffd166;
   --radius:14px;font-size:16px;color-scheme:dark;
@@ -325,168 +325,194 @@ const CL = (() => {
   return { css, clamp, el, randn, shell, card, slider, seg, check, button, tiles, guide, canvasIn, Chart, loop, arrow, rrect, alpha, initTheme, setTheme };
 })();
 </script>
-<script>APPS.cruise = {
-  title: 'Build Your Own Cruise Controller', concept: 'Feedback and tracking', audience: 'Beginners', color: '--sys',
-  blurb: 'Two identical cars, one hill. One driver acts blindly, the other watches the speedometer. Tune the feedback and see why it matters.',
+<script>APPS.pendulum = {
+  title: 'Stabilize an Inverted Pendulum', concept: 'Stability and nonlinear control', audience: 'UG / PG', color: '--sys',
+  blurb: 'The classic benchmark behind Segways, rockets and walking robots. Balance it yourself, then let state feedback (LQR) and an energy-based swing-up do it.',
   mount(root, back) {
-    const { css, clamp, el } = CL;
-    const S = CL.shell(root, { back, title: this.title, subtitle: 'Desired speed → Controller → Engine → Vehicle → Speed sensor → back to Controller', tag: this.concept, audience: this.audience, color: this.color });
-    const P = { m0: 1500, g: 9.81, rho: 1.2, CdA: 0.65, Crr: 0.012, Fmax: 5200, Fbrake: 9000, tau: 0.6 };
-    let st;
-    const reset = () => {
-      const v0 = vref.get() / 3.6;
-      st = { t: 0, s: 0, gust: 0, cars: [mk(v0), mk(v0)] };
-      charts.forEach(c => c.clear());
+    const { css, clamp, el, randn } = CL;
+    const S = CL.shell(root, { back, title: this.title, subtitle: 'ẋ = f(x, u),  x = [cart position, cart velocity, angle, angular velocity],  u = force on the cart', tag: this.concept, audience: this.audience, color: this.color });
+    const g = 9.81, b = 0.1, Mc = 1.0, mNom = 0.2, LNom = 0.5, TRACK = 2.5;
+    const Pm = [[11.66, 6.297, 14.832, 3.648], [6.297, 5.818, 13.646, 3.497], [14.832, 13.646, 57.319, 10.5], [3.648, 3.497, 10.5, 2.49]]; // LQR Riccati solution (nominal)
+    let st, keys = { l: 0, r: 0 }, hist = [];
+    const reset = (down) => {
+      st = { t: 0, x: 0, xd: 0, th: down ? Math.PI - 0.05 : 0.12, thd: 0, F: 0, status: 'ok', bal: 0, best: st ? st.best : 0, ctrlOn: true, swing: false, Fq: [] };
+      hist = []; charts.forEach(c => c.clear());
     };
-    const mk = v => ({ v, F: ffForce(v, P.m0, 0), I: 0, s: 0, u: 0, sl: 0 });
-    function resist(v, m, slope) { const th = Math.atan(slope / 100); return 0.5 * P.rho * P.CdA * v * Math.abs(v) + P.Crr * m * P.g * Math.cos(th) * Math.sign(v || 1) + m * P.g * Math.sin(th); }
-    function ffForce(v, m, slope) { return resist(v, m, slope); }
-    const thr2F = u => u >= 0 ? u * P.Fmax : u * P.Fbrake;
-    const F2thr = F => F >= 0 ? F / P.Fmax : F / P.Fbrake;
+    const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 
-    // ---------- layout
-    const vis = el('div', { class: 'visual' }); S.left.append(vis); const cv = CL.canvasIn(vis);
-    const pl = el('div', { class: 'plots' }); S.left.append(pl);
-    const cSpeed = new CL.Chart(pl, { title: 'Speed', yUnit: 'km/h', window: 40, minSpan: 10, series: [{ name: 'Desired', color: '--ok', dash: [6, 4] }, { name: 'Feedback car', color: '--sys' }, { name: 'Open-loop car', color: '--muted', dash: [3, 3] }] });
-    const cU = new CL.Chart(pl, { title: 'Control input (throttle + / brake −)', yUnit: '%', window: 40, minSpan: 20, zero: true, height: 120, series: [{ name: 'Feedback', color: '--ctl' }, { name: 'Open-loop', color: '--ctl', dash: [3, 3], alpha: .6 }] });
-    const cE = new CL.Chart(pl, { title: 'Tracking error = desired − actual', yUnit: 'km/h', window: 40, minSpan: 4, zero: true, height: 120, series: [{ name: 'Feedback', color: '--err' }, { name: 'Open-loop', color: '--err', dash: [3, 3], alpha: .6 }] });
-    const charts = [cSpeed, cU, cE];
+    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/7.5' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots two' }); S.left.append(pl);
+    const cTh = new CL.Chart(pl, { title: 'Pole angle from upright', yUnit: 'deg', window: 15, minSpan: 10, zero: true, height: 140, series: [{ name: 'θ', color: '--sys' }] });
+    const cX = new CL.Chart(pl, { title: 'Cart position', yUnit: 'm', window: 15, minSpan: 1, zero: true, height: 140, series: [{ name: 'x', color: '--sys' }, { name: 'target', color: '--ok', dash: [6, 4] }] });
+    const cF = new CL.Chart(pl, { title: 'Control force', yUnit: 'N', window: 15, minSpan: 10, zero: true, height: 140, series: [{ name: 'u', color: '--ctl' }] });
+    const cV = new CL.Chart(pl, { title: 'Lyapunov function V = xᵀPx', yUnit: '', window: 15, minSpan: .5, yMin: 0, height: 140, series: [{ name: 'V', color: '--ai' }] });
+    const charts = [cTh, cX, cF, cV];
 
-    const tl = CL.card(S.right, 'Live numbers');
-    const T = CL.tiles(tl, [['vf', 'Feedback car', '--sys'], ['vo', 'Open-loop car', '--muted'], ['ef', 'Feedback error', '--err'], ['u', 'Throttle', '--ctl']]);
+    const tl = CL.card(S.right, 'Status');
+    const T = CL.tiles(tl, [['st', 'State', '--ok'], ['bal', 'Balanced for', '--sys'], ['best', 'Best (manual)', '--ctl']]);
 
-    const cc = CL.card(S.right, 'Set the scene');
-    const vref = CL.slider(cc, { label: 'Desired speed', min: 30, max: 130, value: 80, unit: 'km/h', color: '--ok' });
-    const slope = CL.slider(cc, { label: 'Road slope', min: -10, max: 10, step: .5, value: 0, unit: '%', dec: 1, color: '--err', hint: '+ uphill, − downhill' });
-    const hills = CL.check(cc, 'Rolling hills (slope changes along the road)', false);
-    const mass = CL.slider(cc, { label: 'Car + load mass', min: 1000, max: 2600, step: 50, value: 1500, unit: 'kg', color: '--err', hint: 'Both drivers assume 1500 kg. Change this to create model uncertainty.' });
-    const bt = el('div', { class: 'btns' }); cc.append(bt);
-    CL.button(bt, '💨 Headwind gust', () => { st.gust = 5; }, 'warn');
+    const mc = CL.card(S.right, 'Who is in control?');
+    const mode = CL.seg(mc, { options: [['auto', 'Feedback controller'], ['manual', 'You'], ['off', 'Nobody']], value: 'auto', onChange: v => { if (v === 'manual') { reset(false); st.th = 0.03; } } });
+    const manHint = el('div', { class: 'muted', style: 'font-size:.85rem' }, ['Hold ', el('span', { class: 'kbd' }, '←'), ' / ', el('span', { class: 'kbd' }, '→'), ' or the buttons below to push the cart.']); mc.append(manHint);
+    const mb = el('div', { class: 'btns', style: 'margin-top:6px' }); mc.append(mb);
+    const hold = (b, k) => { const on = e => { e.preventDefault(); keys[k] = 1; }, off = () => { keys[k] = 0; }; b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); };
+    hold(CL.button(mb, '◀ push left', () => { }), 'l'); hold(CL.button(mb, 'push right ▶', () => { }), 'r');
+    const swing = CL.check(mc, 'Energy-based swing-up when the pole is down (nonlinear)', true);
 
-    const kc = CL.card(S.right, 'Design the controller');
-    const ff = CL.check(kc, 'Feedforward: start from the driver\'s best guess of throttle', true);
-    const kp = CL.slider(kc, { label: 'Proportional gain Kp', min: 0, max: 20, step: .5, value: 4, dec: 1, unit: '%/(km/h)', color: '--ctl', hint: 'React to the present error' });
-    const ki = CL.slider(kc, { label: 'Integral gain Ki', min: 0, max: 6, step: .1, value: 0, dec: 1, unit: '%/(km/h·s)', color: '--ctl', hint: 'React to accumulated past error' });
-    const lag = CL.check(kc, 'Realistic engine lag (0.6 s)', true);
+    const kc = CL.card(S.right, 'State-feedback gains'); kc.append(CL.el('div', { class: 'eq', style: 'margin-bottom:6px' }, 'u = Kθ·θ + Kω·ω + Kx·(x − x*) + Kv·v'));
+    const kth = CL.slider(kc, { label: 'Kθ  angle', min: 0, max: 150, step: .5, value: 73.5, dec: 1, color: '--ctl' });
+    const kw = CL.slider(kc, { label: 'Kω  angular velocity', min: 0, max: 30, step: .1, value: 14.8, dec: 1, color: '--ctl' });
+    const kx = CL.slider(kc, { label: 'Kx  cart position', min: 0, max: 30, step: .1, value: 10, dec: 1, color: '--ctl' });
+    const kv = CL.slider(kc, { label: 'Kv  cart velocity', min: 0, max: 30, step: .1, value: 11.8, dec: 1, color: '--ctl' });
+    const pr = el('div', { class: 'btns' }); kc.append(pr);
+    const preset = (a, b2, c, d) => () => { mode.set('auto'); kth.set(a); kw.set(b2); kx.set(c); kv.set(d); };
+    CL.button(pr, 'LQR (optimal)', preset(73.5, 14.8, 10, 11.8), 'pri'); CL.button(pr, 'Angle only', preset(73.5, 14.8, 0, 0)); CL.button(pr, 'Too weak', preset(10, 3, 0, 0), 'warn'); CL.button(pr, 'Over-damped', preset(40, 30, 3, 8));
+
+    const dc = CL.card(S.right, 'Reality check: disturbances and uncertainty');
+    const xt = CL.slider(dc, { label: 'Target cart position x*', min: -1.5, max: 1.5, step: .1, value: 0, dec: 1, unit: 'm', color: '--ok' });
+    const fmax = CL.slider(dc, { label: 'Motor force limit', min: 5, max: 80, step: 1, value: 40, unit: 'N', color: '--err' });
+    const nz = CL.slider(dc, { label: 'Angle sensor noise', min: 0, max: 3, step: .1, value: 0, dec: 1, unit: 'deg', color: '--err' });
+    const dly = CL.slider(dc, { label: 'Control delay', min: 0, max: 120, step: 5, value: 0, unit: 'ms', color: '--err' });
+    const mp = CL.slider(dc, { label: 'Real pole mass (controller assumes 0.2 kg)', min: .05, max: 1.2, step: .05, value: .2, dec: 2, unit: 'kg', color: '--err' });
+    const wind = CL.slider(dc, { label: 'Random push (wind)', min: 0, max: 6, step: .5, value: 0, dec: 1, unit: 'N', color: '--err' });
+    const db = el('div', { class: 'btns' }); dc.append(db);
+    CL.button(db, '👉 Tap the pole', () => { st.thd += (Math.random() < .5 ? -1 : 1) * 1.6; }, 'warn');
+    CL.button(db, 'Start hanging down', () => reset(true));
+    CL.button(db, 'Start upright', () => reset(false));
 
     const ex = CL.card(S.right, 'What you are seeing', 'explain'); const exT = el('div'); ex.append(exT);
-
     CL.guide(S.right, [
-      { title: 'Flat road: both cars agree', text: 'On a flat road with the nominal mass, the open-loop driver\'s guess of throttle is exactly right. Both cars hold the desired speed. <b>Open loop works when the world matches your model.</b>', setup: () => { slope.set(0); hills.set(false); mass.set(1500); kp.set(4); ki.set(0); reset(); } },
-      { title: 'A hill appears', text: 'Drag the slope to +6 %. Gravity now pulls back. The open-loop car keeps the same throttle and slows down a lot. The feedback car sees the error and pushes harder.', setup: () => { slope.set(6); } },
-      { title: 'Turn up the gain', text: 'Increase Kp. The error of the feedback car shrinks, but it never reaches zero: a purely proportional controller needs some error to keep pushing.', setup: () => { slope.set(6); kp.set(12); ki.set(0); } },
-      { title: 'Add memory (integral action)', text: 'Raise Ki to about 1.5. The controller accumulates past error and keeps adding throttle until the error is gone. This is the <b>I</b> in PID.', setup: () => { slope.set(6); kp.set(8); ki.set(1.5); } },
-      { title: 'The model is wrong', text: 'Set slope back to 0 and load the car to 2400 kg. The open-loop guess is now wrong even on flat road. Feedback does not need a perfect model: this is <b>robustness</b>.', setup: () => { slope.set(0); mass.set(2400); kp.set(8); ki.set(1.5); } },
-      { title: 'Too greedy?', text: 'Push Kp and Ki to their maximum and hit the gust button. With engine lag, an over-eager controller overshoots and oscillates. Good control balances speed of response with <b>stability</b>.', setup: () => { kp.set(20); ki.set(6); mass.set(1500); hills.set(true); } },
+      { title: 'Nobody in control', text: 'Choose <b>Nobody</b>. Upright is an <b>equilibrium</b> (forces balance), but an <b>unstable</b> one: the tiniest tilt grows. Where does the pole end up? Hanging down is the stable equilibrium.', setup: () => { mode.set('off'); reset(false); } },
+      { title: 'You are the controller', text: 'Choose <b>You</b> and keep the pole up with the arrow keys. You will find yourself moving the cart <i>under</i> the falling pole, just as you move your hand under a balanced broomstick.', setup: () => { mode.set('manual'); } },
+      { title: 'Angle feedback only', text: 'Press <b>Angle only</b>. The pole stays up, but the cart drifts and eventually hits the end of the track. Stabilising one variable is not enough: the controller must watch the <b>whole state</b>.', setup: () => { preset(73.5, 14.8, 0, 0)(); reset(false); } },
+      { title: 'Full state feedback (LQR)', text: 'Press <b>LQR</b>. Now the pole stays up <i>and</i> the cart returns to x*. Move the target slider: notice the cart first moves the <i>wrong</i> way to tilt the pole in the direction it wants to travel. V(x) keeps decreasing — that is a Lyapunov certificate.', setup: () => { preset(73.5, 14.8, 10, 11.8)(); reset(false); } },
+      { title: 'Robustness test', text: 'Increase the real pole mass, add noise, a 60 ms delay and wind. Linear LQR tolerates a surprising amount — until it does not. Robust control asks: <i>how much uncertainty can we guarantee to survive?</i>', setup: () => { mp.set(.5); nz.set(1); dly.set(60); wind.set(2); } },
+      { title: 'Nonlinear: swing-up', text: 'Press <b>Start hanging down</b>. A linear controller is useless 180° away from upright. A nonlinear energy-pumping law swings the pole up, then hands over to LQR near the top. This is a hybrid nonlinear controller.', setup: () => { mp.set(.2); nz.set(0); dly.set(0); wind.set(0); preset(73.5, 14.8, 10, 11.8)(); swing.set(true); reset(true); } },
     ]);
+    S.resetB.onclick = () => reset(false); reset(false);
+    const kd = e => { if (e.key === 'ArrowLeft') { keys.l = 1; e.preventDefault(); } if (e.key === 'ArrowRight') { keys.r = 1; e.preventDefault(); } };
+    const ku = e => { if (e.key === 'ArrowLeft') keys.l = 0; if (e.key === 'ArrowRight') keys.r = 0; };
+    window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
+    cv.cv.addEventListener('pointerdown', e => { const r = cv.cv.getBoundingClientRect(); const px = e.clientX - r.left; st.thd += (px < geo.bx ? -1 : 1) * 1.4; });
 
-    S.resetB.onclick = reset; reset();
-
-    const dt = 0.01;
-    function slopeAt(s) { return slope.get() + (hills.get() ? 6 * Math.sin(s / 350) + 2.5 * Math.sin(s / 97) : 0); }
-    function step() {
-      const m = mass.get(), vr = vref.get() / 3.6;
-      const g = st.gust > 0 ? 1600 : 0; st.gust = Math.max(0, st.gust - dt);
-      st.cars.forEach((c, k) => {
-        const sl = slopeAt(c.s);
-        const uff = ff.get() || k === 1 ? F2thr(ffForce(vr, P.m0, 0)) : 0;
-        let u;
-        if (k === 1) u = uff; // open loop: fixed guess
-        else {
-          const e = (vr - c.v) * 3.6; // km/h
-          const uI = ki.get() / 100 * c.I;
-          u = uff + kp.get() / 100 * e + uI;
-          const us = clamp(u, -1, 1);
-          if (us === u || Math.sign(e) !== Math.sign(u)) c.I += e * dt; // anti-windup
-          u = us;
-        }
-        c.u = clamp(u, -1, 1);
-        const Ft = thr2F(c.u);
-        c.F += lag.get() ? (Ft - c.F) * dt / P.tau : (Ft - c.F);
-        const a = (c.F - resist(c.v, m, sl) - g) / m;
-        c.v = Math.max(0, c.v + a * dt); c.s += c.v * dt; c.sl = sl;
-      });
-      st.t += dt;
+    function deriv(s, F, m, L) {
+      const sn = Math.sin(s.th), cs = Math.cos(s.th);
+      const xdd = (F - b * s.xd + m * L * s.thd * s.thd * sn - m * g * sn * cs) / (Mc + m * sn * sn);
+      const thdd = (g * sn - xdd * cs) / L - 0.02 * s.thd;
+      return [s.xd, xdd, s.thd, thdd];
     }
-    let acc = 0, pushT = 0;
+    function controller() {
+      const thm = wrap(st.th) + nz.get() * Math.PI / 180 * randn();
+      const m = mNom, L = LNom;
+      if (mode.get() === 'off') return 0;
+      if (mode.get() === 'manual') return (keys.r - keys.l) * 15;
+      const near = Math.abs(thm) < 0.6;
+      if (!near) {
+        st.swing = swing.get();
+        if (!swing.get()) return 0;
+        const E = 0.5 * m * L * L * st.thd * st.thd + m * g * L * (Math.cos(thm) - 1);
+        let a = clamp(30 * E * Math.sign(st.thd * Math.cos(thm) || 1), -7, 7) - 2.0 * (st.x - 0) - 2.5 * st.xd;
+        if (Math.abs(E) < 0.01 && Math.abs(thm) > 2.9 && Math.abs(st.thd) < 0.05) a = 6; // kick if resting at the bottom
+        const sn = Math.sin(thm), cs = Math.cos(thm);
+        return (Mc + m * sn * sn) * a + b * st.xd - m * L * st.thd * st.thd * sn + m * g * sn * cs;
+      }
+      st.swing = false;
+      return kth.get() * thm + kw.get() * st.thd + kx.get() * (st.x - xt.get()) + kv.get() * st.xd;
+    }
+    const dt = 0.002; let wnd = 0;
+    function step() {
+      let F = clamp(controller(), -fmax.get(), fmax.get());
+      st.Fq.push(F); const nd = Math.round(dly.get() / 1000 / dt); while (st.Fq.length > nd + 1) st.Fq.shift(); F = st.Fq[0];
+      st.F = F;
+      wnd += (wind.get() * randn() * 3 - wnd) * dt / 0.3;
+      const m = mp.get(), L = LNom, Ft = F + wnd;
+      const s = st, k1 = deriv(s, Ft, m, L);
+      const s2 = { x: s.x + k1[0] * dt / 2, xd: s.xd + k1[1] * dt / 2, th: s.th + k1[2] * dt / 2, thd: s.thd + k1[3] * dt / 2 }, k2 = deriv(s2, Ft, m, L);
+      const s3 = { x: s.x + k2[0] * dt / 2, xd: s.xd + k2[1] * dt / 2, th: s.th + k2[2] * dt / 2, thd: s.thd + k2[3] * dt / 2 }, k3 = deriv(s3, Ft, m, L);
+      const s4 = { x: s.x + k3[0] * dt, xd: s.xd + k3[1] * dt, th: s.th + k3[2] * dt, thd: s.thd + k3[3] * dt }, k4 = deriv(s4, Ft, m, L);
+      s.x += dt / 6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]); s.xd += dt / 6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
+      s.th += dt / 6 * (k1[2] + 2 * k2[2] + 2 * k3[2] + k4[2]); s.thd += dt / 6 * (k1[3] + 2 * k2[3] + 2 * k3[3] + k4[3]);
+      if (Math.abs(s.x) > TRACK) { s.x = Math.sign(s.x) * TRACK; s.xd = -0.2 * s.xd; s.thd += 0; s.status = 'crash'; s.crashT = s.t; }
+      st.t += dt;
+      const up = Math.abs(wrap(st.th)) < 0.35;
+      if (up) { st.bal += dt; if (mode.get() === 'manual') st.best = Math.max(st.best, st.bal); } else st.bal = 0;
+      st.status = s.crashT != null && s.t - s.crashT < 1 ? 'crash' : up ? 'ok' : st.swing ? 'swing' : 'fall';
+    }
+    let acc = 0, pushT = -1;
     const L = CL.loop((rdt, paused) => {
-      if (!paused) { acc += rdt; while (acc >= dt) { step(); acc -= dt; } }
-      if (st.t - pushT >= 0.05) {
-        pushT = st.t; const vr = vref.get(); const [f, o] = st.cars;
-        cSpeed.push(st.t, [vr, f.v * 3.6, o.v * 3.6]); cU.push(st.t, [f.u * 100, o.u * 100]); cE.push(st.t, [vr - f.v * 3.6, vr - o.v * 3.6]);
+      if (!paused) { acc += rdt; let n = 0; while (acc >= dt && n++ < 60) { step(); acc -= dt; } if (n >= 60) acc = 0; }
+      if (st.t - pushT >= 0.03) {
+        pushT = st.t; const th = wrap(st.th);
+        const xv = [st.x - xt.get(), st.xd, th, st.thd]; let V = 0; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) V += xv[i] * Pm[i][j] * xv[j];
+        cTh.push(st.t, [th * 180 / Math.PI]); cX.push(st.t, [st.x, xt.get()]); cF.push(st.t, [st.F]); cV.push(st.t, [Math.abs(th) < 0.6 ? V : null]);
+        hist.push([th, st.thd]); if (hist.length > 400) hist.shift();
       }
       charts.forEach(c => c.draw()); draw(); explain();
     }, S.pauseB);
-
-    function drawCar(ctx, x, y, ang, color, ghost, label) {
-      ctx.save(); ctx.translate(x, y); ctx.rotate(-ang); ctx.globalAlpha = ghost ? .55 : 1;
-      ctx.fillStyle = color; CL.rrect(ctx, -46, -30, 92, 22, 7); ctx.fill();
-      CL.rrect(ctx, -26, -46, 50, 20, 8); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,.55)'; CL.rrect(ctx, -20, -42, 18, 12, 3); ctx.fill(); CL.rrect(ctx, 2, -42, 17, 12, 3); ctx.fill();
-      ctx.fillStyle = '#111'; [-28, 28].forEach(wx => { ctx.beginPath(); ctx.arc(wx, -8, 9, 0, 7); ctx.fill(); });
-      ctx.fillStyle = '#aaa'; [-28, 28].forEach(wx => { ctx.beginPath(); ctx.arc(wx, -8, 3.5, 0, 7); ctx.fill(); });
-      ctx.globalAlpha = 1; ctx.fillStyle = color; ctx.font = '600 12px Inter,system-ui'; ctx.textAlign = 'center'; ctx.fillText(label, 0, ghost ? -54 : 22);
-      ctx.restore();
-    }
+    const geo = { bx: 0 };
     function draw() {
       const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
-      const [f, o] = st.cars;
-      // sky gradient
-      const gr = ctx.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, CL.alpha(css('--sys'), .18)); gr.addColorStop(1, 'transparent'); ctx.fillStyle = gr; ctx.fillRect(0, 0, w, h);
-      const pxm = w / 60; // px per metre
-      const camS = f.s; const cx = w * 0.42;
-      // terrain: integrate height from slope (exaggerated x3 for visibility)
-      const pts = []; const ex = 3;
-      const ref = h * 0.68;
-      let hgt = 0; const s0 = camS - cx / pxm; const N = 120; const ds = (w / pxm) / N;
-      const hAt = []; for (let i = 0; i <= N; i++) { const s = s0 + i * ds; hAt.push(hgt); hgt += slopeAt(s) / 100 * ex * ds; }
-      const hc = hAt[Math.round(cx / pxm / ds)] || 0;
-      for (let i = 0; i <= N; i++) pts.push([i * ds * pxm, ref - (hAt[i] - hc) * pxm]);
-      ctx.beginPath(); ctx.moveTo(0, h); pts.forEach(p => ctx.lineTo(p[0], p[1])); ctx.lineTo(w, h); ctx.closePath();
-      ctx.fillStyle = CL.alpha(css('--muted'), .25); ctx.fill();
-      ctx.strokeStyle = css('--muted'); ctx.lineWidth = 3; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
-      // lane dashes
-      ctx.strokeStyle = css('--ink'); ctx.globalAlpha = .35; ctx.lineWidth = 2; ctx.setLineDash([14, 18]); ctx.lineDashOffset = (camS * pxm) % 32;
-      ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1] + 10) : ctx.moveTo(p[0], p[1] + 10)); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
-      const yAt = x => { const i = clamp(Math.round(x / pxm / ds), 0, N); return pts[i][1]; };
-      const angAt = x => { const i = clamp(Math.round(x / pxm / ds), 1, N); return Math.atan2(pts[i - 1][1] - pts[i][1], ds * pxm); };
-      // open-loop car position relative
-      let ox = cx + (o.s - f.s) * pxm; const off = ox < 40 || ox > w - 40; ox = clamp(ox, 50, w - 50);
-      drawCar(ctx, ox, yAt(ox) - 16, angAt(ox), css('--muted'), true, 'Open loop' + (off ? (o.s < f.s ? ' (far behind ◄)' : ' (far ahead ►)') : ''));
-      drawCar(ctx, cx, yAt(cx) + 2, angAt(cx), css('--sys'), false, 'Feedback');
-      // forces on feedback car
-      const a = angAt(cx), ux = Math.cos(a), uy = -Math.sin(a), y0 = yAt(cx) - 20;
-      const sc = 0.012; const m = mass.get();
-      const Fg = m * P.g * Math.sin(Math.atan(f.sl / 100)), Fd = 0.5 * P.rho * P.CdA * f.v * f.v;
-      CL.arrow(ctx, cx + 50 * ux, y0 + 50 * uy, cx + (50 + Math.max(0, f.F) * sc) * ux, y0 + (50 + Math.max(0, f.F) * sc) * uy, css('--ctl'), 4, f.F > 50 ? 'engine' : '');
-      if (Fg > 30) CL.arrow(ctx, cx - 50 * ux, y0 - 50 * uy + 10, cx - (50 + Fg * sc) * ux, y0 - (50 + Fg * sc) * uy + 10, css('--err'), 4, 'gravity');
-      CL.arrow(ctx, cx - 50 * ux, y0 - 50 * uy - 14, cx - (50 + Fd * sc) * ux, y0 - (50 + Fd * sc) * uy - 14, CL.alpha(css('--err'), .7), 3, 'drag');
-      if (st.gust > 0) { ctx.fillStyle = css('--err'); ctx.font = '700 15px Inter'; ctx.textAlign = 'left'; ctx.fillText('💨 headwind gust!', w - 190, 30); }
-      // speed readouts
-      ctx.textAlign = 'left'; ctx.font = '700 22px "Space Grotesk",Inter'; ctx.fillStyle = css('--sys'); ctx.fillText((f.v * 3.6).toFixed(1) + ' km/h', 14, 32);
-      ctx.font = '600 14px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText('open loop: ' + (o.v * 3.6).toFixed(1) + ' km/h   •   road ' + f.sl.toFixed(1) + ' %', 14, 54);
-      ctx.fillStyle = css('--ok'); ctx.fillText('target ' + vref.get() + ' km/h', 14, 74);
+      const pw = w > 700 ? w * 0.72 : w; const sc = (pw - 60) / (2 * TRACK + 0.6); const cx0 = 30 + (TRACK + 0.3) * sc; const ty = h * 0.78;
+      // rails
+      ctx.strokeStyle = css('--muted'); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(cx0 - (TRACK + .2) * sc, ty); ctx.lineTo(cx0 + (TRACK + .2) * sc, ty); ctx.stroke();
+      ctx.fillStyle = css('--err'); [-1, 1].forEach(sg => ctx.fillRect(cx0 + sg * (TRACK + .2) * sc - 5, ty - 30, 10, 34));
+      ctx.fillStyle = css('--ok'); ctx.beginPath(); ctx.moveTo(cx0 + xt.get() * sc, ty + 6); ctx.lineTo(cx0 + xt.get() * sc - 8, ty + 20); ctx.lineTo(cx0 + xt.get() * sc + 8, ty + 20); ctx.fill();
+      ctx.font = '11px Inter'; ctx.textAlign = 'center'; ctx.fillText('x*', cx0 + xt.get() * sc, ty + 33);
+      const bx = cx0 + st.x * sc; geo.bx = bx;
+      const sz = Math.max(40, sc * 0.35);
+      ctx.fillStyle = css('--sys'); CL.rrect(ctx, bx - sz / 2, ty - sz * .55, sz, sz * .5, 6); ctx.fill();
+      ctx.fillStyle = '#111'; [-1, 1].forEach(sg => { ctx.beginPath(); ctx.arc(bx + sg * sz * .3, ty - 4, 6, 0, 7); ctx.fill(); });
+      const pivY = ty - sz * .55; const Lp = Math.min(h * 0.62, sc * 1.1);
+      const px = bx + Lp * Math.sin(st.th), py = pivY - Lp * Math.cos(st.th);
+      const col = st.status === 'ok' ? css('--sys') : st.status === 'swing' ? css('--ai') : css('--err');
+      ctx.strokeStyle = col; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(bx, pivY); ctx.lineTo(px, py); ctx.stroke();
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, py, 6 + 10 * Math.sqrt(mp.get() / .2) * .8, 0, 7); ctx.fill();
+      ctx.strokeStyle = CL.alpha(css('--ok'), .5); ctx.setLineDash([4, 5]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bx, pivY); ctx.lineTo(bx, pivY - Lp); ctx.stroke(); ctx.setLineDash([]);
+      // force arrow
+      const fa = st.F / 40 * sc * 0.8; if (Math.abs(fa) > 3) CL.arrow(ctx, bx + Math.sign(fa) * sz / 2, ty - sz * .3, bx + Math.sign(fa) * sz / 2 + fa, ty - sz * .3, css('--ctl'), 5);
+      if (Math.abs(wnd) > .3) CL.arrow(ctx, bx - wnd * 8, ty - sz * .8, bx, ty - sz * .8, CL.alpha(css('--err'), .8), 2);
+      ctx.textAlign = 'left'; ctx.font = '700 18px "Space Grotesk",Inter'; ctx.fillStyle = col;
+      const lab = { ok: 'BALANCED', fall: mode.get() === 'auto' && !swing.get() ? 'OUTSIDE REGION OF ATTRACTION – controller off' : 'FALLING / DOWN', swing: 'SWINGING UP (energy control)', crash: 'HIT THE END STOP' }[st.status];
+      ctx.fillText(lab, 14, 28);
+      ctx.font = '13px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText(`θ = ${(wrap(st.th) * 180 / Math.PI).toFixed(1)}°   x = ${st.x.toFixed(2)} m   u = ${st.F.toFixed(1)} N`, 14, 48);
+      if (mode.get() === 'manual') { ctx.fillStyle = css('--ctl'); ctx.fillText('You are the controller: ← →  (click the scene to tap the pole)', 14, 68); }
+      // phase portrait
+      if (w > 700) {
+        const ox = w * 0.74, ow = w * 0.24, oy = 16, oh = h - 40; ctx.fillStyle = css('--panel'); CL.rrect(ctx, ox, oy, ow, oh, 10); ctx.fill();
+        ctx.fillStyle = css('--muted'); ctx.font = '600 12px Inter'; ctx.fillText('Phase portrait (θ, ω)', ox + 10, oy + 18);
+        const cxp = ox + ow / 2, cyp = oy + oh / 2 + 8, sx = ow / 2 / 0.8, sy = (oh / 2 - 20) / 4;
+        ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ox + 6, cyp); ctx.lineTo(ox + ow - 6, cyp); ctx.moveTo(cxp, oy + 26); ctx.lineTo(cxp, oy + oh - 6); ctx.stroke();
+        ctx.fillStyle = css('--ok'); ctx.beginPath(); ctx.arc(cxp, cyp, 5, 0, 7); ctx.fill(); ctx.font = '11px Inter'; ctx.fillText('goal', cxp + 7, cyp - 6);
+        ctx.save(); ctx.beginPath(); ctx.rect(ox, oy + 22, ow, oh - 22); ctx.clip();
+        ctx.strokeStyle = css('--sys'); ctx.lineWidth = 1.5; ctx.beginPath();
+        hist.forEach((p, i) => { const X = cxp + p[0] * sx, Y = cyp - p[1] * sy; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.stroke();
+        const lp = hist[hist.length - 1]; if (lp) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cxp + lp[0] * sx, cyp - lp[1] * sy, 5, 0, 7); ctx.fill(); }
+        ctx.restore(); ctx.fillStyle = css('--muted'); ctx.fillText('θ →', ox + ow - 30, cyp + 14); ctx.fillText('ω ↑', cxp + 4, oy + 34);
+      }
     }
     let lastEx = 0;
     function explain() {
       if (performance.now() - lastEx < 400) return; lastEx = performance.now();
-      const [f, o] = st.cars, vr = vref.get(), ef = vr - f.v * 3.6, eo = vr - o.v * 3.6; const m = mass.get();
-      T.set('vf', (f.v * 3.6).toFixed(1)); T.set('vo', (o.v * 3.6).toFixed(1)); T.set('ef', ef.toFixed(1)); T.set('u', (f.u * 100).toFixed(0) + ' %');
-      const msg = [];
-      if (Math.abs(eo) < 1.5 && Math.abs(ef) < 1.5) msg.push('Both cars are on target. Nothing is disturbing the system, so even acting blindly works.');
-      if (Math.abs(eo) >= 1.5) msg.push(`The <b>open-loop</b> car is ${Math.abs(eo).toFixed(0)} km/h ${eo > 0 ? 'too slow' : 'too fast'}: it never looks at its speedometer, so it cannot correct.`);
-      if (Math.abs(ef) >= 1.5 && ki.get() < 0.05 && kp.get() > 0) msg.push(`The <b>feedback</b> car still has ${ef.toFixed(1)} km/h error. A proportional controller only pushes harder <i>because</i> there is an error. Add integral action to remove it.`);
-      else if (Math.abs(ef) < 1.5 && Math.abs(eo) >= 1.5) msg.push('The <b>feedback</b> car measured the error and adjusted the throttle to cancel the disturbance.');
-      if (Math.abs(f.u) > 0.995) msg.push(`<span style="color:var(--err)">The throttle is saturated at ${f.u > 0 ? '100 %' : 'full brake'}. No controller can ask for more than the engine can give.</span>`);
-      if (m !== 1500) msg.push(`The car weighs ${m} kg but both drivers planned for 1500 kg: a <b>model error</b>.`);
-      if (kp.get() === 0 && ki.get() === 0) msg.push('With both gains at zero, the feedback car is really open loop too.');
-      exT.innerHTML = msg.map(s => `<p>${s}</p>`).join('');
+      const lab = { ok: 'Balanced', fall: 'Down', swing: 'Swing-up', crash: 'Crashed' }[st.status];
+      T.set('st', lab); T.color('st', st.status === 'ok' ? '--ok' : st.status === 'swing' ? '--ai' : '--err'); T.set('bal', st.bal.toFixed(1) + ' s'); T.set('best', st.best.toFixed(1) + ' s');
+      const m = [], md = mode.get();
+      if (md === 'off') m.push('No control: the upright equilibrium is unstable, so gravity wins and the pole falls to the stable hanging position.');
+      if (md === 'manual') m.push('Your brain is closing the loop: eyes are the sensor, your fingers the actuator. Your reaction time (~0.2 s) is a delay, which is why this is hard.');
+      if (md === 'auto') {
+        if (st.status === 'ok' && kx.get() === 0 && kv.get() === 0) m.push('The angle is stabilised, but nothing controls the cart position, so the cart drifts. Part of the state is uncontrolled.');
+        else if (st.status === 'ok') m.push(`Every ${(dt * 1000).toFixed(0)} ms the controller measures the full state and sets u = K·x. The purple V(x) curve going down shows the system losing “error energy”: a Lyapunov function.`);
+        if (kth.get() < (Mc + mp.get()) * g && kth.get() > 0) m.push(`Kθ is below (M+m)·g ≈ ${((Mc + mp.get()) * g).toFixed(1)} N/rad: the controller cannot push hard enough to beat gravity, whatever the other gains are.`);
+        if (st.status === 'swing') m.push('Far from upright, a nonlinear law pumps energy into the pole (like pumping a swing). Near the top it hands over to the linear LQR controller.');
+        if (Math.abs(st.F) >= fmax.get() - .01) m.push('<span style="color:var(--err)">Motor at its force limit (saturation).</span>');
+        if (mp.get() !== .2) m.push(`The real pole is ${mp.get()} kg but the gains were designed for 0.2 kg. Feedback gives robustness, within limits.`);
+      }
+      exT.innerHTML = m.map(s => `<p>${s}</p>`).join('');
     }
-    return { stop: L.stop };
+    return { stop: () => { L.stop(); window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); } };
   }
 };
 
-CL.initTheme(); APPS['cruise'].mount(document.getElementById('root'), false);</script>
+CL.initTheme(); APPS['pendulum'].mount(document.getElementById('root'), false);</script>
 <script>/* link back to the main website */
 (function () {
   var a = document.createElement('a');

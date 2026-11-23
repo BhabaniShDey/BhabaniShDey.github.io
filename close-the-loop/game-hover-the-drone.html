@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Control Lab – thermo</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"><style>:root{
+<title>Hover the Drone · Close the Loop</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"><style>:root{
   --bg:#0b1020;--panel:#121a30;--panel2:#18223d;--ink:#e8edf7;--muted:#9aa7c2;--line:#26324f;--grid:#1d2742;
   --sys:#4da3ff;--ctl:#ff9f43;--ok:#2ecc71;--err:#ff5d5d;--ai:#b48cff;--warn:#ffd166;
   --radius:14px;font-size:16px;color-scheme:dark;
@@ -325,165 +325,220 @@ const CL = (() => {
   return { css, clamp, el, randn, shell, card, slider, seg, check, button, tiles, guide, canvasIn, Chart, loop, arrow, rrect, alpha, initTheme, setTheme };
 })();
 </script>
-<script>APPS.thermo = {
-  title: 'Temperature Control Lab: P, I and D', concept: 'PID control', audience: 'School / UG', color: '--ctl',
-  blurb: 'Heat or cool a water bath with a delayed, noisy sensor. Compare an on–off thermostat with P, PI and PID, and watch the three terms work.',
+<script>/* School mini-games */
+function gameShell(root, back, o) {
+  const S = CL.shell(root, { back, title: o.title, subtitle: o.subtitle, tag: 'Mini-game', audience: 'School students', color: o.color });
+  return S;
+}
+
+APPS['game-shower'] = {
+  title: 'Game: The Perfect Shower', concept: 'Feedback with delay', audience: 'School (Class 8–12)', color: '--ctl', game: true,
+  blurb: 'Keep the shower between 37 °C and 40 °C for 60 seconds. The catch: hot water takes 2 seconds to reach you. Then watch a controller try.',
   mount(root, back) {
     const { css, clamp, el, randn } = CL;
-    const S = CL.shell(root, { back, title: this.title, subtitle: 'u(t) = Kp·e(t) + Ki·∫e dt + Kd·de/dt   — present, past and future of the error', tag: this.concept, audience: this.audience, color: this.color });
-    const K = 50, TAU = 60, SPEED = 6; // °C gain at full power, time constant (s), playback speed
-    let st;
-    const reset = () => {
-      st = { t: 0, T: amb.get(), I: 0, buf: [], dF: 0, prevY: amb.get(), u: 0, up: 0, ui: 0, ud: 0, onoff: 0, spT: 0, spV: sp.get(), peak: -1e9, settle: null, iae: 0, energy: 0, start: amb.get() };
-      charts.forEach(c => c.clear());
-    };
-    const vis = el('div', { class: 'visual' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const S = gameShell(root, back, { title: this.title, subtitle: 'You are the controller. Your skin is the sensor. The tap is the actuator.', color: this.color });
+    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/7' }); S.left.append(vis); const cv = CL.canvasIn(vis);
     const pl = el('div', { class: 'plots' }); S.left.append(pl);
-    const cT = new CL.Chart(pl, { title: 'Temperature', yUnit: '°C', window: 300, minSpan: 6, series: [{ name: 'Setpoint', color: '--ok', dash: [6, 4] }, { name: 'Measured', color: '--sys', width: 1.2, alpha: .55 }, { name: 'True', color: '--sys' }] });
-    const cU = new CL.Chart(pl, { title: 'Control effort (heater + / cooler −)', yUnit: '%', window: 300, yMin: -110, yMax: 110, zero: true, height: 140, series: [{ name: 'Total (after limits)', color: '--ctl', width: 2.5 }, { name: 'P', color: '--sys', width: 1.3 }, { name: 'I', color: '--ai', width: 1.3 }, { name: 'D', color: '--ok', width: 1.3 }] });
-    const charts = [cT, cU];
-    const tl = CL.card(S.right, 'Performance since last setpoint change');
-    const T = CL.tiles(tl, [['os', 'Overshoot', '--err'], ['ts', 'Settling time', '--sys'], ['ss', 'Error now', '--err'], ['en', 'Energy used', '--ctl']]);
-
-    const mc = CL.card(S.right, 'Controller');
-    const mode = CL.seg(mc, { options: [['onoff', 'On–Off'], ['pid', 'PID']], value: 'pid' });
-    const kp = CL.slider(mc, { label: 'Kp  (present)', min: 0, max: 80, step: 1, value: 15, unit: '%/°C', color: '--sys' });
-    const ki = CL.slider(mc, { label: 'Ki  (past)', min: 0, max: 5, step: .05, value: 0, dec: 2, unit: '%/(°C·s)', color: '--ai' });
-    const kd = CL.slider(mc, { label: 'Kd  (future)', min: 0, max: 80, step: 1, value: 0, unit: '%·s/°C', color: '--ok' });
-    const hyst = CL.slider(mc, { label: 'On–Off band', min: 0.2, max: 4, step: .1, value: 1, dec: 1, unit: '°C' });
-    const aw = CL.check(mc, 'Anti-windup (stop integrating when the heater is maxed out)', true);
-    const pr = el('div', { class: 'btns' }); mc.append(el('div', { class: 'muted', style: 'font-size:.8rem;margin:2px 0 4px' }, 'Presets'), pr);
-    const preset = (m, p, i, d) => () => { mode.set(m); kp.set(p); ki.set(i); kd.set(d); };
-    CL.button(pr, 'On–Off', preset('onoff', 15, 0, 0)); CL.button(pr, 'P only', preset('pid', 15, 0, 0)); CL.button(pr, 'PI', preset('pid', 15, .47, 0));
-    CL.button(pr, 'PID', preset('pid', 20, .6, 30)); CL.button(pr, 'Too aggressive', preset('pid', 60, 4, 0), 'warn');
-
-    const pc = CL.card(S.right, 'The water bath');
-    const sp = CL.slider(pc, { label: 'Setpoint', min: 10, max: 70, step: 1, value: 50, unit: '°C', color: '--ok', onInput: v => { if (st) { st.spT = st.t; st.spV = v; st.peak = -1e9; st.settle = null; st.iae = 0; st.energy = 0; st.start = st.T; } } });
-    const amb = CL.slider(pc, { label: 'Room (ambient) temperature', min: 5, max: 40, step: 1, value: 25, unit: '°C', color: '--err' });
-    const delay = CL.slider(pc, { label: 'Sensor/transport delay', min: 0, max: 15, step: .5, value: 4, dec: 1, unit: 's', color: '--err' });
-    const noise = CL.slider(pc, { label: 'Sensor noise', min: 0, max: 1.5, step: .05, value: .15, dec: 2, unit: '°C', color: '--err' });
-    const bt = el('div', { class: 'btns' }); pc.append(bt);
-    CL.button(bt, '🧊 Pour in cold water', () => { st.T -= 12; }, 'warn');
-    const win = CL.check(pc, 'Window open (extra heat loss)', false);
-
-    const ex = CL.card(S.right, 'What you are seeing', 'explain'); const exT = el('div'); ex.append(exT);
-    CL.guide(S.right, [
-      { title: 'The thermostat way', text: 'A household thermostat is <b>on–off</b>: full power below the band, off above. Watch the temperature zig-zag. The delay makes it overshoot the band every time.', setup: () => { preset('onoff', 15, 0, 0)(); reset(); } },
-      { title: 'Proportional: push harder when farther away', text: 'Switch to <b>P only</b>. The response is smooth but settles <i>below</i> 50 °C. Heat leaks out all the time, and P only produces power when there is an error, so some error must remain.', setup: () => { preset('pid', 15, 0, 0)(); reset(); } },
-      { title: 'Integral: remember the past', text: 'Choose <b>PI</b>. The purple I-term slowly grows while the error persists, until the error is gone. Look at the effort plot: at steady state the I-term supplies almost all the power.', setup: () => { preset('pid', 15, .47, 0)(); reset(); } },
-      { title: 'Disturbance rejection', text: 'Press <b>Pour in cold water</b> and open the window. Watch the I-term increase to compensate for the new heat loss. The setpoint is recovered without anyone retuning anything.' },
-      { title: 'Derivative: anticipate', text: 'Choose <b>PID</b> and change the setpoint. The green D-term opposes fast changes and acts like a brake as you approach the target. Now raise the sensor noise and see why engineers filter or limit D.', setup: () => { preset('pid', 20, .6, 30)(); } },
-      { title: 'Windup', text: 'Choose PI, untick <b>anti-windup</b>, set the setpoint to 10 °C, wait, then set it to 60 °C. While the cooler or heater is saturated, the integral keeps growing, so the temperature overshoots badly. Tick anti-windup and repeat.', setup: () => { preset('pid', 15, .47, 0)(); aw.set(false); } },
-      { title: 'Too aggressive = unstable', text: 'Choose <b>Too aggressive</b>, then increase the delay. The loop starts to oscillate and never settles. High gain plus delay erodes stability: this is why tuning is a science.', setup: () => { preset('pid', 60, 4, 0)(); delay.set(6); } },
-    ]);
-    S.resetB.onclick = reset; reset();
-
-    const dt = 0.05;
-    function step() {
-      const Ta = amb.get() - (win.get() ? 15 : 0), loss = win.get() ? 1.6 : 1;
-      const yTrue = st.T, y = yTrue + noise.get() * randn();
-      const e = sp.get() - y;
-      let u;
-      if (mode.get() === 'onoff') {
-        if (e > hyst.get() / 2) st.onoff = 1; else if (e < -hyst.get() / 2) st.onoff = sp.get() < Ta ? -1 : 0;
-        if (sp.get() < Ta - 1 && e < -hyst.get() / 2) st.onoff = -1;
-        u = st.onoff; st.up = u; st.ui = 0; st.ud = 0;
-      } else {
-        const dy = (y - st.prevY) / dt; st.prevY = y; st.dF += (-dy - st.dF) * dt / 1.0; // filtered derivative on measurement
-        st.up = kp.get() / 100 * e; st.ud = kd.get() / 100 * st.dF;
-        const Inew = st.I + e * dt; let ui = ki.get() / 100 * Inew;
-        u = st.up + ui + st.ud; const us = clamp(u, -1, 1);
-        if (!aw.get() || us === u || Math.sign(e) !== Math.sign(u)) st.I = Inew;
-        st.ui = ki.get() / 100 * st.I; u = us;
+    const ch = new CL.Chart(pl, { title: 'Water temperature at your head', yUnit: '°C', window: 60, yMin: 20, yMax: 55, series: [{ name: 'Temperature', color: '--sys' }, { name: 'Tap setting (scaled)', color: '--ctl', dash: [4, 3], dec: 0, noscale: true }] });
+    ch.extra = [{ y: 40, color: '--ok', label: '' }, { y: 37, color: '--ok', label: 'comfort band' }];
+    const c1 = CL.card(S.right, 'Your controls');
+    const tap = CL.slider(c1, { label: 'Tap: cold ← → hot', min: 0, max: 100, step: 1, value: 30, unit: '% hot', color: '--ctl' });
+    c1.append(el('div', { class: 'muted', style: 'font-size:.85rem' }, ['Keyboard: ', el('span', { class: 'kbd' }, '←'), ' colder, ', el('span', { class: 'kbd' }, '→'), ' hotter']));
+    const mode = CL.seg(c1, { label: 'Who controls the tap?', options: [['you', 'You'], ['pi', 'Controller (PI)']], value: 'you' });
+    const lag = CL.slider(c1, { label: 'Pipe delay', min: 0, max: 5, step: .5, value: 2, dec: 1, unit: 's', color: '--err' });
+    const bb = el('div', { class: 'btns' }); c1.append(bb);
+    CL.button(bb, '▶ Start 60-second round', () => reset(true), 'pri');
+    const c2 = CL.card(S.right, 'Score');
+    const T = CL.tiles(c2, [['time', 'Time left', '--sys'], ['in', 'In comfort band', '--ok'], ['best', 'Best (you)', '--ctl']]);
+    const ex = CL.card(S.right, 'Think about it', 'explain');
+    ex.innerHTML += '<p>Why do people overshoot when adjusting a shower? What would happen with a 5-second delay? What does the controller do differently from you?</p><p class="muted">Concept: closed-loop feedback, delay, overshoot and oscillation. In a real shower, the delay is the time water takes to travel through the pipe.</p>';
+    let st, best = 0, events = [];
+    function reset(run) { st = { t: 0, T: 30, q: [], inb: 0, run, I: 0, done: false }; ch.clear(); events = [[12 + Math.random() * 6, 'Someone flushed the toilet! (less cold water)', 9], [32 + Math.random() * 6, 'Boiler hiccup (water cooler)', -10], [48 + Math.random() * 5, 'Flush again!', 8]]; }
+    reset(false);
+    S.resetB.onclick = () => reset(false);
+    const kd = e => { if (e.key === 'ArrowLeft') tap.set(clamp(tap.get() - 3, 0, 100)); if (e.key === 'ArrowRight') tap.set(clamp(tap.get() + 3, 0, 100)); };
+    window.addEventListener('keydown', kd);
+    let dist = 0, msg = '', msgT = 0;
+    const dt = 0.02;
+    let acc = 0; const L = CL.loop((rdt, paused) => {
+      if (!paused) for (acc += rdt; acc >= dt; acc -= dt) {
+        if (st.run && !st.done) {
+          events.forEach(ev => { if (!ev.fired && st.t >= ev[0]) { ev.fired = true; dist += ev[2]; msg = ev[1]; msgT = 3; } });
+        }
+        dist *= (1 - dt / 8);
+        if (mode.get() === 'pi') { const e = 38.5 - st.T; st.I += e * dt; tap.set(clamp(30 + 2.2 * e + 0.6 * st.I, 0, 100)); }
+        const mix = 15 + tap.get() / 100 * 45 + dist;
+        st.q.push(mix); const nd = Math.round(lag.get() / dt); while (st.q.length > nd + 1) st.q.shift();
+        st.T += (st.q[0] - st.T) * dt / 0.6;
+        st.t += dt; msgT -= dt;
+        if (st.run && !st.done) { if (st.T >= 37 && st.T <= 40) st.inb += dt; if (st.t >= 60) { st.done = true; if (mode.get() === 'you') best = Math.max(best, st.inb / 60 * 100); } }
       }
-      st.u = clamp(u, -1, 1);
-      st.buf.push(st.u); const nd = Math.round(delay.get() / dt); while (st.buf.length > nd + 1) st.buf.shift();
-      const ud = st.buf.length > nd ? st.buf[0] : 0;
-      st.T += dt * (K * ud - loss * (st.T - Ta)) / TAU;
-      st.t += dt; st.y = y;
-      // metrics
-      const dir = Math.sign(st.spV - (st.start ?? st.T)) || 1;
-      st.peak = Math.max(st.peak, dir * (st.T - st.spV));
-      if (Math.abs(st.T - st.spV) > 0.5) st.settle = null; else if (st.settle == null) st.settle = st.t - st.spT;
-      st.iae += Math.abs(e) * dt; st.energy += Math.abs(ud) * 2 * dt / 3600; // 2 kW heater → kWh
-    }
-    let acc = 0, pushT = -1;
-    const L = CL.loop((rdt, paused) => {
-      if (!paused) { acc += rdt * SPEED; while (acc >= dt) { step(); acc -= dt; } }
-      if (st.t - pushT >= 0.25) {
-        pushT = st.t; cT.push(st.t, [sp.get(), st.y ?? st.T, st.T]);
-        cU.push(st.t, mode.get() === 'onoff' ? [st.u * 100, null, null, null] : [st.u * 100, st.up * 100, st.ui * 100, st.ud * 100]);
-      }
-      cT.extra = mode.get() === 'onoff' ? [{ y: sp.get() + hyst.get() / 2, color: '--muted', label: '' }, { y: sp.get() - hyst.get() / 2, color: '--muted', label: 'band' }] : [];
-      charts.forEach(c => c.draw()); draw(); explain();
+      ch.push(st.t, [st.T, 20 + tap.get() * .35]); ch.draw(); draw();
+      T.set('time', st.run ? Math.max(0, 60 - st.t).toFixed(0) + ' s' : '—'); T.set('in', st.run ? (st.inb / Math.min(60, Math.max(st.t, .01)) * 100).toFixed(0) + ' %' : '—'); T.set('best', best.toFixed(0) + ' %');
     }, S.pauseB);
-
-    let parts = [];
     function draw() {
       const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
-      const tx = w * 0.18, tw = Math.min(w * 0.38, 330), ty = h * 0.18, th = h * 0.68;
-      const f = clamp((st.T - 5) / 70, 0, 1);
-      const water = `rgb(${Math.round(59 + 180 * f)},${Math.round(130 - 62 * f)},${Math.round(246 - 178 * f)})`;
-      // tank
-      ctx.lineWidth = 4; ctx.strokeStyle = css('--muted');
-      ctx.fillStyle = water; ctx.globalAlpha = .85; ctx.fillRect(tx, ty + th * .12, tw, th * .88); ctx.globalAlpha = 1;
-      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx, ty + th); ctx.lineTo(tx + tw, ty + th); ctx.lineTo(tx + tw, ty); ctx.stroke();
-      // heater coil
-      const ud = st.buf.length ? st.buf[0] : 0; const hc = ud >= 0 ? `rgba(255,${160 - 100 * ud},40,${0.25 + 0.75 * ud})` : `rgba(80,170,255,${0.25 - 0.75 * ud})`;
-      ctx.strokeStyle = hc; ctx.lineWidth = 6; ctx.beginPath();
-      for (let i = 0; i <= 40; i++) { const x = tx + 20 + i * (tw - 40) / 40, y = ty + th - 22 + Math.sin(i * 1.2) * 9; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
-      ctx.fillStyle = css('--ctl'); ctx.font = '600 13px Inter'; ctx.textAlign = 'center';
-      ctx.fillText(ud > 0.02 ? `heating ${(ud * 100).toFixed(0)} %` : ud < -0.02 ? `cooling ${(-ud * 100).toFixed(0)} %` : 'actuator idle', tx + tw / 2, ty + th + 22);
-      if (st.buf.length > 1 && Math.abs(st.u - ud) > .05) { ctx.fillStyle = css('--muted'); ctx.fillText(`(commanded ${(st.u * 100).toFixed(0)} % — still on its way: delay)`, tx + tw / 2, ty + th + 40); }
-      // steam / ice particles
-      if (Math.random() < f * 0.6) parts.push({ x: tx + Math.random() * tw, y: ty + th * .12, v: 20 + Math.random() * 30, life: 1 });
-      parts = parts.filter(p => (p.life -= 0.015) > 0);
-      parts.forEach(p => { p.y -= p.v * 0.016; ctx.fillStyle = `rgba(220,220,230,${p.life * .5})`; ctx.beginPath(); ctx.arc(p.x + Math.sin(p.y / 9) * 4, p.y, 5 + (1 - p.life) * 9, 0, 7); ctx.fill(); });
-      // sensor
-      ctx.fillStyle = css('--sys'); ctx.fillRect(tx + tw - 26, ty - 10, 8, th * .6);
-      ctx.font = '600 12px Inter'; ctx.textAlign = 'right'; ctx.fillText('sensor', tx + tw - 30, ty + 4);
-      // thermometer gauge
-      const gx = tx + tw + 70, gy = ty, gh = th; ctx.fillStyle = css('--panel'); CL.rrect(ctx, gx - 12, gy, 24, gh, 12); ctx.fill(); ctx.strokeStyle = css('--line'); ctx.lineWidth = 2; ctx.stroke();
-      const Y = v => gy + gh - (clamp(v, 0, 80) / 80) * gh;
-      ctx.fillStyle = water; CL.rrect(ctx, gx - 8, Y(st.T), 16, gy + gh - Y(st.T) - 2, 8); ctx.fill();
-      ctx.strokeStyle = css('--ok'); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(gx - 24, Y(sp.get())); ctx.lineTo(gx + 24, Y(sp.get())); ctx.stroke();
-      ctx.fillStyle = css('--muted'); ctx.textAlign = 'left'; ctx.font = '11px Inter';
-      for (let v = 0; v <= 80; v += 20) ctx.fillText(v + '°', gx + 18, Y(v) + 4);
-      ctx.fillStyle = css('--ok'); ctx.font = '600 12px Inter'; ctx.fillText('target ' + sp.get() + '°', gx + 30, Y(sp.get()) + 4);
-      ctx.textAlign = 'left'; ctx.font = '700 30px "Space Grotesk",Inter'; ctx.fillStyle = css('--ink'); ctx.fillText(st.T.toFixed(1) + ' °C', 16, 40);
-      ctx.font = '13px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText(`room ${amb.get() - (win.get() ? 15 : 0)} °C${win.get() ? ' (window open)' : ''} • time ×${SPEED}`, 16, 62);
-      // block diagram text on right
-      if (w > 760) {
-        const bx = gx + 120; ctx.font = '600 13px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText('Error now', bx, ty + 10);
-        const e = sp.get() - st.T; ctx.font = '700 22px "Space Grotesk"'; ctx.fillStyle = css('--err'); ctx.fillText((e >= 0 ? '+' : '') + e.toFixed(2) + ' °C', bx, ty + 36);
-        const bar = (lab, v, c, yy) => { ctx.fillStyle = css('--muted'); ctx.font = '12px Inter'; ctx.fillText(lab, bx, yy); const bw = 150; ctx.fillStyle = css('--grid'); ctx.fillRect(bx + 30, yy - 10, bw, 12); ctx.fillStyle = css(c); const vv = clamp(v, -1.5, 1.5) / 1.5 * bw / 2; ctx.fillRect(bx + 30 + bw / 2 + Math.min(0, vv), yy - 10, Math.abs(vv), 12); };
-        if (mode.get() === 'pid') { bar('P', st.up, '--sys', ty + 70); bar('I', st.ui, '--ai', ty + 92); bar('D', st.ud, '--ok', ty + 114); bar('Σ', st.u, '--ctl', ty + 140); }
-      }
+      const cx = w * .35, top = h * .12;
+      ctx.strokeStyle = css('--muted'); ctx.lineWidth = 10; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(cx - 160, h * .8); ctx.lineTo(cx - 160, top); ctx.lineTo(cx, top); ctx.lineTo(cx, top + 30); ctx.stroke();
+      // pipe colour segments (delay visual)
+      const n = st.q.length; for (let i = 0; i < 20; i++) { const v = st.q[Math.floor((1 - i / 20) * (n - 1))] ?? st.T; const f = clamp((v - 15) / 45, 0, 1); ctx.strokeStyle = `rgb(${Math.round(59 + 180 * f)},${Math.round(130 - 62 * f)},${Math.round(246 - 178 * f)})`; ctx.lineWidth = 6; const y0 = h * .8 - i * (h * .8 - top) / 20; ctx.beginPath(); ctx.moveTo(cx - 160, y0); ctx.lineTo(cx - 160, y0 - (h * .8 - top) / 20); ctx.stroke(); }
+      ctx.fillStyle = css('--muted'); ctx.fillRect(cx - 40, top + 30, 80, 14);
+      const f = clamp((st.T - 15) / 45, 0, 1); const col = `rgb(${Math.round(59 + 180 * f)},${Math.round(130 - 62 * f)},${Math.round(246 - 178 * f)})`;
+      for (let i = 0; i < 26; i++) { ctx.strokeStyle = CL.alpha('#ffffff', .0) ; ctx.fillStyle = col; const x = cx - 34 + (i % 13) * 5.5 + Math.sin(st.t * 9 + i) * 3, y = top + 50 + ((st.t * 260 + i * 37) % (h * .55)); ctx.fillRect(x, y, 2.5, 9); }
+      // person (simple)
+      const px = cx, py = h * .62; ctx.fillStyle = css('--panel'); ctx.strokeStyle = css('--ink'); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(px, py - 40, 22, 0, 7); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(px, py - 18); ctx.lineTo(px, py + 50); ctx.stroke();
+      const face = st.T > 40 ? '🥵' : st.T < 37 ? '🥶' : '😊'; ctx.font = '30px serif'; ctx.textAlign = 'center'; ctx.fillText(face, px, py - 30);
+      // tap knob
+      const kx = cx - 160, ky = h * .62; ctx.fillStyle = css('--panel2'); ctx.beginPath(); ctx.arc(kx, ky, 26, 0, 7); ctx.fill();
+      const a = -Math.PI * .75 + tap.get() / 100 * Math.PI * 1.5; CL.arrow(ctx, kx, ky, kx + 24 * Math.cos(a - Math.PI / 2), ky + 24 * Math.sin(a - Math.PI / 2), css('--ctl'), 4);
+      ctx.font = '600 12px Inter'; ctx.fillStyle = css('--sys'); ctx.fillText('cold', kx - 36, ky + 42); ctx.fillStyle = css('--err'); ctx.fillText('hot', kx + 36, ky + 42);
+      ctx.textAlign = 'left'; ctx.font = '700 34px "Space Grotesk",Inter'; ctx.fillStyle = st.T >= 37 && st.T <= 40 ? css('--ok') : css('--err'); ctx.fillText(st.T.toFixed(1) + ' °C', w * .62, h * .35);
+      ctx.font = '14px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText('target 37–40 °C', w * .62, h * .35 + 24);
+      if (msgT > 0) { ctx.fillStyle = css('--err'); ctx.font = '700 16px Inter'; ctx.fillText('⚠ ' + msg, w * .52, h * .65); }
+      if (st.done) { ctx.fillStyle = css('--ok'); ctx.font = '700 20px Inter'; ctx.fillText(`Round over: ${(st.inb / 60 * 100).toFixed(0)} % of the time comfortable`, w * .45, h * .85); }
+      else if (!st.run) { ctx.fillStyle = css('--ctl'); ctx.font = '600 15px Inter'; ctx.fillText('Practise freely, or press “Start 60-second round”.', w * .45, h * .85); }
     }
-    let lastEx = 0;
-    function explain() {
-      if (performance.now() - lastEx < 400) return; lastEx = performance.now();
-      const e = sp.get() - st.T, el2 = st.t - st.spT;
-      T.set('os', st.peak > 0.05 ? st.peak.toFixed(1) + ' °C' : '0'); T.set('ts', st.settle != null ? st.settle.toFixed(0) + ' s' : '…');
-      T.set('ss', e.toFixed(2) + ' °C'); T.set('en', (st.energy * 1000).toFixed(0) + ' Wh');
-      const m = [];
-      if (mode.get() === 'onoff') m.push('On–off control only knows “too cold” or “too hot”. Because of the delay, the heater keeps going after the target is reached, so the temperature cycles around the band. Cheap and robust, but never precise.');
-      else {
-        const pOnly = ki.get() === 0;
-        if (pOnly && Math.abs(e) > 0.4 && el2 > 120) m.push(`<b>Steady-state error</b> of ${e.toFixed(1)} °C. The P-term gives ${(st.up * 100).toFixed(0)} % power only because the error exists. Remove the error and the power disappears too.`);
-        if (!pOnly && Math.abs(e) < 0.4 && el2 > 60) m.push(`On target. The <span style="color:var(--ai)">I-term</span> now supplies ${(st.ui * 100).toFixed(0)} % power: it has “learned” how much power the heat leak needs.`);
-        if (Math.abs(st.u) > 0.995) m.push('<span style="color:var(--err)">The actuator is saturated. While it stays saturated, the controller has no control authority left.</span>' + (!aw.get() && ki.get() > 0 ? ' The integral keeps winding up, so expect a big overshoot later.' : ''));
-        if (kd.get() > 0 && noise.get() > 0.5) m.push('The D-term amplifies sensor noise; that is why its effort line is jittery. Real controllers filter the derivative.');
-        if (kp.get() > 45 && ki.get() > 2) m.push('Gains this high, with a delay, give persistent oscillation: the controller keeps reacting to old information.');
-      }
-      if (!m.length) m.push('Change the setpoint or press “Pour in cold water” and watch how each term reacts.');
-      exT.innerHTML = m.map(s => `<p>${s}</p>`).join('');
-    }
-    return { stop: L.stop };
+    return { stop: () => { L.stop(); window.removeEventListener('keydown', kd); } };
   }
 };
 
-CL.initTheme(); APPS['thermo'].mount(document.getElementById('root'), false);</script>
+APPS['game-drone'] = {
+  title: 'Game: Hover the Drone', concept: 'Stability and disturbance rejection', audience: 'School (Class 8–12)', color: '--sys', game: true,
+  blurb: 'Hold the thrust button to fly a delivery drone through moving altitude gates while gusts push it around. Then switch on the autopilot.',
+  mount(root, back) {
+    const { css, clamp, el, randn } = CL;
+    const S = gameShell(root, back, { title: this.title, subtitle: 'Thrust fights gravity. Too little and you fall; too much and you overshoot.', color: this.color });
+    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/8;user-select:none' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots' }); S.left.append(pl);
+    const ch = new CL.Chart(pl, { title: 'Altitude', yUnit: 'm', window: 30, yMin: 0, yMax: 12, series: [{ name: 'Gate centre', color: '--ok', dash: [6, 4] }, { name: 'Drone', color: '--sys' }] });
+    const c1 = CL.card(S.right, 'Controls');
+    const thr = el('button', { class: 'b pri', style: 'width:100%;padding:18px;font-size:1.1rem;touch-action:none' }, '⬆ HOLD FOR THRUST  (or Space)'); c1.append(thr);
+    let hold = 0; thr.addEventListener('pointerdown', e => { e.preventDefault(); hold = 1; }); ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => thr.addEventListener(ev, () => hold = 0));
+    const kd = e => { if (e.code === 'Space') { hold = 1; e.preventDefault(); } }, ku = e => { if (e.code === 'Space') hold = 0; };
+    window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
+    const mode = CL.seg(c1, { label: 'Pilot', options: [['you', 'You'], ['pd', 'Autopilot (PD)'], ['pid', 'Autopilot (PID)']], value: 'you' });
+    const gust = CL.slider(c1, { label: 'Wind gusts', min: 0, max: 6, step: .5, value: 2, dec: 1, color: '--err' });
+    const pay = CL.slider(c1, { label: 'Parcel mass', min: 0, max: 1.5, step: .1, value: 0, dec: 1, unit: 'kg', color: '--err', hint: 'The autopilot was tuned for an empty drone.' });
+    const bb = el('div', { class: 'btns' }); c1.append(bb); CL.button(bb, '▶ Start 45-second round', () => reset(true), 'pri');
+    const c2 = CL.card(S.right, 'Score'); const T = CL.tiles(c2, [['t', 'Time left', '--sys'], ['in', 'Inside gates', '--ok'], ['best', 'Best (you)', '--ctl']]);
+    const ex = CL.card(S.right, 'Think about it', 'explain');
+    ex.innerHTML += '<p>Why does the PD autopilot hover slightly below the gate when carrying a parcel? Why does adding I (PID) fix it? Is the drone stable if nobody controls it?</p><p class="muted">Concept: unstable open-loop behaviour, feedback stabilisation, steady-state error and integral action.</p>';
+    let st, best = 0;
+    function target(t) { return 5 + 3 * Math.sin(t / 6) + 1.5 * Math.sin(t / 2.3 + 1); }
+    function reset(run) { st = { t: 0, z: 4, v: 0, run, inb: 0, done: false, I: 0, wind: 0, u: 0 }; ch.clear(); }
+    reset(false); S.resetB.onclick = () => reset(false);
+    const dt = 0.01, g = 9.81, m0 = 1.2, Tmax = 2.1 * m0 * g;
+    let acc = 0; const L = CL.loop((rdt, paused) => {
+      if (!paused) for (acc += rdt; acc >= dt; acc -= dt) {
+        const m = m0 + pay.get(), r = target(st.t);
+        let u;
+        if (mode.get() === 'you') u = hold;
+        else { const e = r - st.z; if (mode.get() === 'pid') st.I = clamp(st.I + e * dt, -10, 10); else st.I = 0; u = clamp((m0 * g + m0 * (6 * e - 4 * st.v + (mode.get() === 'pid' ? 4 * st.I : 0))) / Tmax, 0, 1); }
+        st.u += (u - st.u) * dt / 0.08;
+        st.wind += (gust.get() * randn() * 2.5 - st.wind) * dt / 0.6;
+        const a = (st.u * Tmax + st.wind) / m - g - 0.3 * st.v;
+        st.v += a * dt; st.z += st.v * dt; if (st.z < 0) { st.z = 0; st.v = Math.max(0, st.v); } if (st.z > 12) { st.z = 12; st.v = Math.min(0, st.v); }
+        st.t += dt;
+        if (st.run && !st.done) { if (Math.abs(st.z - r) < 0.8) st.inb += dt; if (st.t >= 45) { st.done = true; if (mode.get() === 'you') best = Math.max(best, st.inb / 45 * 100); } }
+      }
+      ch.push(st.t, [target(st.t), st.z]); ch.draw(); draw();
+      T.set('t', st.run ? Math.max(0, 45 - st.t).toFixed(0) + ' s' : '—'); T.set('in', st.run ? (st.inb / Math.min(45, Math.max(.01, st.t)) * 100).toFixed(0) + ' %' : '—'); T.set('best', best.toFixed(0) + ' %');
+    }, S.pauseB);
+    function draw() {
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
+      const Y = z => h - 20 - z / 12 * (h - 40), sx = 40; // px per second ahead
+      const x0 = w * .3;
+      ctx.fillStyle = CL.alpha(css('--muted'), .3); ctx.fillRect(0, h - 20, w, 20);
+      // gates ahead
+      for (let tt = Math.ceil(st.t) - 8; tt < st.t + (w - x0) / sx; tt += 2) {
+        const x = x0 + (tt - st.t) * sx, r = target(tt); ctx.strokeStyle = CL.alpha(css('--ok'), .7); ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(x, Y(r + .8)); ctx.lineTo(x, Y(r + .8) - 10); ctx.moveTo(x, Y(r - .8)); ctx.lineTo(x, Y(r - .8) + 10); ctx.stroke();
+        ctx.fillStyle = CL.alpha(css('--ok'), .12); ctx.fillRect(x - 3, Y(r + .8), 6, Y(r - .8) - Y(r + .8));
+      }
+      const zx = x0, zy = Y(st.z), inb = Math.abs(st.z - target(st.t)) < .8;
+      ctx.save(); ctx.translate(zx, zy); ctx.rotate(st.wind * 0.03);
+      ctx.fillStyle = inb ? css('--sys') : css('--err'); CL.rrect(ctx, -30, -8, 60, 16, 6); ctx.fill();
+      ctx.strokeStyle = css('--ink'); ctx.lineWidth = 3; [-38, 38].forEach(px => { ctx.beginPath(); ctx.moveTo(px - 16, -14); ctx.lineTo(px + 16, -14); ctx.stroke(); ctx.beginPath(); ctx.moveTo(px, -8); ctx.lineTo(px, -14); ctx.stroke(); });
+      if (pay.get() > 0) { ctx.fillStyle = '#b5835a'; ctx.fillRect(-12, 10, 24, 16 + pay.get() * 6); }
+      ctx.restore();
+      if (st.u > .05) CL.arrow(ctx, zx, zy - 20, zx, zy - 20 - st.u * 60, css('--ctl'), 4);
+      CL.arrow(ctx, zx + 50, zy, zx + 50, zy + 40, css('--err'), 3, ''); ctx.fillStyle = css('--err'); ctx.font = '11px Inter'; ctx.fillText('gravity', zx + 56, zy + 30);
+      if (Math.abs(st.wind) > 1) { CL.arrow(ctx, zx - 70, zy, zx - 70, zy - st.wind * 6, CL.alpha(css('--err'), .7), 3); }
+      ctx.font = '700 18px "Space Grotesk",Inter'; ctx.textAlign = 'left'; ctx.fillStyle = css('--ink'); ctx.fillText(`altitude ${st.z.toFixed(1)} m`, 14, 28);
+      if (st.done) { ctx.fillStyle = css('--ok'); ctx.font = '700 20px Inter'; ctx.fillText(`Round over: inside the gates ${(st.inb / 45 * 100).toFixed(0)} % of the time`, 14, 56); }
+    }
+    return { stop: () => { L.stop(); window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); } };
+  }
+};
+
+APPS['game-traffic'] = {
+  title: 'Game: The Traffic Controller', concept: 'Feedback vs fixed schedules', audience: 'School (Class 8–12)', color: '--err', game: true,
+  blurb: 'Run a busy junction. Switch the lights yourself, then compare a fixed timer with a feedback controller that counts the queues.',
+  mount(root, back) {
+    const { css, clamp, el } = CL;
+    const S = gameShell(root, back, { title: this.title, subtitle: 'Sensor = queue length, actuator = traffic light, objective = least total waiting time', color: this.color });
+    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/8' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots' }); S.left.append(pl);
+    const ch = new CL.Chart(pl, { title: 'Queue lengths', yUnit: 'cars', window: 120, minSpan: 6, yMin: 0, series: [{ name: 'North–South', color: '--sys' }, { name: 'East–West', color: '--ctl' }] });
+    const c1 = CL.card(S.right, 'Controls');
+    const swB = el('button', { class: 'b pri', style: 'width:100%;padding:16px;font-size:1.05rem' }, '🚦 SWITCH LIGHTS  (or Space)'); c1.append(swB);
+    const mode = CL.seg(c1, { label: 'Who runs the signal?', options: [['you', 'You'], ['timer', 'Fixed timer'], ['fb', 'Feedback']], value: 'you' });
+    const rNS = CL.slider(c1, { label: 'North–South traffic', min: 2, max: 30, step: 1, value: 18, unit: 'cars/min', color: '--sys' });
+    const rEW = CL.slider(c1, { label: 'East–West traffic', min: 2, max: 30, step: 1, value: 8, unit: 'cars/min', color: '--ctl' });
+    const green = CL.slider(c1, { label: 'Fixed timer: green time', min: 5, max: 40, step: 1, value: 20, unit: 's' });
+    const bb = el('div', { class: 'btns' }); c1.append(bb); CL.button(bb, '▶ Start 2-minute round', () => reset(true), 'pri'); CL.button(bb, '🚑 Rush hour on N–S', () => rNS.set(28), 'warn');
+    const c2 = CL.card(S.right, 'Score'); const T = CL.tiles(c2, [['t', 'Time left', '--sys'], ['thr', 'Cars through', '--ok'], ['wait', 'Avg. wait', '--err'], ['best', 'Best avg. wait (you)', '--ctl']]);
+    const ex = CL.card(S.right, 'Think about it', 'explain');
+    ex.innerHTML += '<p>Why does a fixed timer waste green time when one road is empty? What does the feedback controller measure? Why must there be a minimum green time and an amber phase (safety constraint)?</p><p class="muted">Concept: open-loop schedule vs closed-loop feedback; constraints; trading off two queues.</p>';
+    let st, best = Infinity;
+    function reset(run) { st = { t: 0, phase: 0, amber: 0, since: 0, q: [[], []], passed: 0, waitSum: 0, run, done: false, acc: [0, 0], next: 0 }; ch.clear(); }
+    reset(false); S.resetB.onclick = () => reset(false);
+    const sw = () => { if (st.amber > 0 || st.since < 3) return; st.amber = 3; };
+    swB.onclick = () => { if (mode.get() === 'you') sw(); };
+    const kd = e => { if (e.code === 'Space') { e.preventDefault(); if (mode.get() === 'you') sw(); } }; window.addEventListener('keydown', kd);
+    const dt = 0.05, SPEED = 2;
+    let acc = 0; const L = CL.loop((rdt, paused) => {
+      if (!paused) for (acc += rdt * SPEED; acc >= dt; acc -= dt) {
+        [rNS.get(), rEW.get()].forEach((r, k) => { if (Math.random() < r / 60 * dt) st.q[k].push(st.t); });
+        if (st.amber > 0) { st.amber -= dt; if (st.amber <= 0) { st.phase = 1 - st.phase; st.since = 0; } }
+        else {
+          st.since += dt;
+          const g = st.phase, o = 1 - g;
+          if (st.q[g].length) { st.next -= dt; if (st.next <= 0) { const t0 = st.q[g].shift(); st.next = 1.8; if (st.run && !st.done) { st.passed++; st.waitSum += st.t - t0; } } } else st.next = 0;
+          if (mode.get() === 'timer' && st.since >= green.get()) sw();
+          if (mode.get() === 'fb' && st.since >= 6 && (st.q[o].length > st.q[g].length + 3 || (st.q[g].length === 0 && st.q[o].length > 0))) sw();
+        }
+        st.t += dt;
+        if (st.run && !st.done && st.t >= 120) { st.done = true; const aw = avgWait(); if (mode.get() === 'you') best = Math.min(best, aw); }
+      }
+      ch.push(st.t, [st.q[0].length, st.q[1].length]); ch.draw(); draw();
+      T.set('t', st.run ? Math.max(0, 120 - st.t).toFixed(0) + ' s' : '—'); T.set('thr', st.passed); T.set('wait', st.run ? avgWait().toFixed(1) + ' s' : '—'); T.set('best', isFinite(best) ? best.toFixed(1) + ' s' : '—');
+    }, S.pauseB);
+    function avgWait() { // include cars still waiting
+      let s = st.waitSum, n = st.passed; st.q.forEach(q => q.forEach(t0 => { s += st.t - t0; n++; })); return n ? s / n : 0;
+    }
+    function draw() {
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
+      const cx = w / 2, cy = h / 2, rw = Math.min(w, h) * .18;
+      ctx.fillStyle = CL.alpha(css('--muted'), .35); ctx.fillRect(cx - rw / 2, 0, rw, h); ctx.fillRect(0, cy - rw / 2, w, rw);
+      ctx.strokeStyle = css('--ink'); ctx.globalAlpha = .4; ctx.setLineDash([10, 10]); ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, h); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      const carW = 16, gap = 22;
+      st.q[0].forEach((_, i) => { ctx.fillStyle = css('--sys'); CL.rrect(ctx, cx - rw / 4 - carW / 2, cy - rw / 2 - 10 - (i + 1) * gap, carW, 18, 4); ctx.fill(); });
+      st.q[1].forEach((_, i) => { ctx.fillStyle = css('--ctl'); CL.rrect(ctx, cx + rw / 2 + 10 + i * gap, cy - rw / 4 - carW / 2, 18, carW, 4); ctx.fill(); });
+      const light = (x, y, k) => { const on = st.amber > 0 ? (st.phase === k ? 'amber' : 'red') : st.phase === k ? 'green' : 'red'; ctx.fillStyle = '#222'; CL.rrect(ctx, x - 12, y - 32, 24, 64, 6); ctx.fill(); [['red', '#ff4d4d', -20], ['amber', '#ffb020', 0], ['green', '#2ecc71', 20]].forEach(([n, c, dy]) => { ctx.fillStyle = on === n ? c : '#444'; ctx.beginPath(); ctx.arc(x, y + dy, 8, 0, 7); ctx.fill(); }); };
+      light(cx - rw / 2 - 26, cy - rw / 2 - 40, 0); light(cx + rw / 2 + 40, cy - rw / 2 - 26, 1);
+      ctx.font = '600 13px Inter'; ctx.fillStyle = css('--sys'); ctx.textAlign = 'right'; ctx.fillText(`N–S queue: ${st.q[0].length}`, cx - rw / 2 - 50, 24);
+      ctx.fillStyle = css('--ctl'); ctx.textAlign = 'left'; ctx.fillText(`E–W queue: ${st.q[1].length}`, cx + rw / 2 + 60, cy + rw / 2 + 24);
+      ctx.fillStyle = css('--muted'); ctx.fillText(`time ×${SPEED}`, 12, h - 12);
+      if (st.done) { ctx.fillStyle = css('--ok'); ctx.font = '700 18px Inter'; ctx.fillText(`Round over: ${st.passed} cars, average wait ${avgWait().toFixed(1)} s`, 12, 26); }
+    }
+    return { stop: () => { L.stop(); window.removeEventListener('keydown', kd); } };
+  }
+};
+
+CL.initTheme(); APPS['game-drone'].mount(document.getElementById('root'), false);</script>
 <script>/* link back to the main website */
 (function () {
   var a = document.createElement('a');

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Control Lab – robot</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"><style>:root{
+<title>Smart-Home Energy MPC · Close the Loop</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"><style>:root{
   --bg:#0b1020;--panel:#121a30;--panel2:#18223d;--ink:#e8edf7;--muted:#9aa7c2;--line:#26324f;--grid:#1d2742;
   --sys:#4da3ff;--ctl:#ff9f43;--ok:#2ecc71;--err:#ff5d5d;--ai:#b48cff;--warn:#ffd166;
   --radius:14px;font-size:16px;color-scheme:dark;
@@ -325,220 +325,194 @@ const CL = (() => {
   return { css, clamp, el, randn, shell, card, slider, seg, check, button, tiles, guide, canvasIn, Chart, loop, arrow, rrect, alpha, initTheme, setTheme };
 })();
 </script>
-<script>APPS.robot = {
-  title: 'Autonomous Robot Challenge', concept: 'Trajectory tracking and safety', audience: 'All audiences', color: '--ok',
-  blurb: 'Three robots, one goal. One only chases the target; one adds a safety filter (control barrier function); one also accounts for wind and sensor noise. Reaching the goal is not the same as reaching it safely.',
+<script>APPS.energy = {
+  title: 'Smart Home Energy Manager: Rules vs Model Predictive Control', concept: 'Optimisation and predictive control', audience: 'Advanced', color: '--ai',
+  blurb: 'A home with rooftop solar, a battery and an electric car on a time-of-use tariff. A simple rule-based controller competes with MPC, which re-plans every hour using forecasts.',
   mount(root, back) {
-    const { css, clamp, el, randn } = CL;
-    const S = CL.shell(root, { back, title: this.title, subtitle: 'Safety filter: choose u closest to u_nominal such that  ∇h·u ≥ −α·h  for every obstacle  (h ≥ 0 means safe)', tag: this.concept, audience: this.audience, color: this.color });
-    const W = 12, H = 7, RR = 0.25, ELL = 0.25, DT = 0.02;
-    const defs = [
-      { key: 'nom', name: 'Nominal (go to goal)', color: '--sys' },
-      { key: 'cbf', name: 'Safe (CBF filter)', color: '--ok' },
-      { key: 'rob', name: 'Robust safe (CBF + disturbance bound)', color: '--ai' },
-    ];
-    let obs = [{ x: 6, y: 3.5, r: 0.9 }, { x: 8.6, y: 2.2, r: 0.6 }, { x: 8.8, y: 5.0, r: 0.55 }, { x: 3.8, y: 5.6, r: 0.5 }];
-    let goal = { x: 11, y: 3.6 }, start = { x: 1, y: 3.4, phi: 0 };
-    let bots = [], t = 0;
-    const newRun = () => {
-      t = 0; bots = defs.map(d => ({ ...d, x: start.x, y: start.y, phi: start.phi, trail: [], col: 0, inCol: false, minC: Infinity, done: null, u: [0, 0], v: 0, w: 0, est: null, kick: [0, 0] }));
-      charts.forEach(c => c.clear());
-    };
+    const { css, clamp, el } = CL;
+    const S = CL.shell(root, { back, title: this.title, subtitle: 'MPC: at every hour, optimise the next N hours using forecasts → apply only the first decision → measure → repeat', tag: this.concept, audience: this.audience, color: this.color });
+    const HRS = 48, BCAP = 10, BSTEP = 0.5, NB = Math.round(BCAP / BSTEP) + 1, ETA = 0.95, EVSTEP = 2, EVP = [0, 2, 4, 6], PLUG = 18, DEPART = 31, EXP = 3;
+    const price = h => { const hh = h % 24; return hh >= 22 || hh < 6 ? 5 : hh >= 17 ? 11 : 7.5; };
+    const loadP = h => { const hh = h % 24; return 0.55 + 1.3 * Math.exp(-((hh - 8) ** 2) / 3) + 2.4 * Math.exp(-((hh - 20.5) ** 2) / 4) + 0.35 * Math.exp(-((hh - 13) ** 2) / 8) + (h >= 24 ? 0.1 : 0); };
+    const pvClear = h => { const hh = h % 24; return hh <= 6 || hh >= 18 ? 0 : 5 * Math.pow(Math.sin(Math.PI * (hh - 6) / 12), 1.4); };
+    let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
 
-    const vis = el('div', { class: 'visual', style: 'aspect-ratio:12/7' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/6.4' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const tr = el('div', { class: 'card' }); S.left.append(tr);
+    const playRow = el('div', { class: 'btns', style: 'align-items:center' }); tr.append(playRow);
+    let playing = true; const playB = CL.button(playRow, '❚❚ Pause playback', () => { playing = !playing; playB.textContent = playing ? '❚❚ Pause playback' : '▶ Play'; });
+    const hourS = el('input', { type: 'range', min: 0, max: HRS - 1, step: 1, value: 0, style: 'flex:1;min-width:200px' }); playRow.append(hourS);
+    const hourL = el('b', { style: 'min-width:150px' }); playRow.append(hourL);
     const pl = el('div', { class: 'plots two' }); S.left.append(pl);
-    const ser = n => defs.map(d => ({ name: d.key === 'nom' ? 'Nominal' : d.key === 'cbf' ? 'CBF' : 'Robust', color: d.color, dec: n }));
-    const cC = new CL.Chart(pl, { title: 'Clearance to nearest obstacle', yUnit: 'm', window: 25, minSpan: 1, zero: true, height: 140, series: ser(2) });
-    cC.extra = [{ y: 0, color: '--err', label: 'collision' }];
-    const cE = new CL.Chart(pl, { title: 'Tracking error (distance to goal)', yUnit: 'm', window: 25, minSpan: 1, yMin: 0, height: 140, series: ser(1) });
-    const cU = new CL.Chart(pl, { title: 'Control effort |u|', yUnit: 'm/s', window: 25, minSpan: .5, yMin: 0, height: 140, series: ser(2) });
-    const cH = new CL.Chart(pl, { title: 'Safety filter intervention |u − u_nom|', yUnit: 'm/s', window: 25, minSpan: .5, yMin: 0, height: 140, series: ser(2) });
-    const charts = [cC, cE, cU, cH];
+    const xf = x => { const d = Math.floor(x / 24) + 1, hh = Math.round(x % 24); return hh === 0 ? 'Day ' + d : hh + 'h'; };
+    const cA = new CL.Chart(pl, { title: 'Solar & load (kW), price (₹/kWh)', yUnit: '', height: 160, xFmt: xf, minSpan: 4, yMin: 0, series: [{ name: 'Solar (actual)', color: '--warn' }, { name: 'Solar forecast', color: '--warn', dash: [4, 4], alpha: .7 }, { name: 'Load', color: '--sys' }, { name: 'Price', color: '--err', width: 1.5, alpha: .8 }] });
+    const cG = new CL.Chart(pl, { title: 'Grid import (+) / export (−)', yUnit: 'kW', height: 160, xFmt: xf, minSpan: 4, zero: true, series: [{ name: 'Rule-based', color: '--muted' }, { name: 'MPC', color: '--ai' }] });
+    const cB = new CL.Chart(pl, { title: 'Home battery state of charge', yUnit: 'kWh', height: 160, xFmt: xf, yMin: 0, yMax: BCAP, series: [{ name: 'Rule-based', color: '--muted' }, { name: 'MPC', color: '--ai' }, { name: 'MPC plan', color: '--ai', dash: [3, 3], width: 3, alpha: .6 }] });
+    const cE = new CL.Chart(pl, { title: 'Electric car: energy charged', yUnit: 'kWh', height: 160, xFmt: xf, yMin: 0, series: [{ name: 'Rule-based', color: '--muted' }, { name: 'MPC', color: '--ai' }, { name: 'Needed by 7am', color: '--ok', dash: [6, 4] }] });
+    const cC = new CL.Chart(pl, { title: 'Cumulative electricity bill', yUnit: '₹', height: 160, xFmt: xf, minSpan: 50, zero: true, series: [{ name: 'Rule-based', color: '--muted' }, { name: 'MPC', color: '--ai' }] });
+    const cP = new CL.Chart(pl, { title: 'Control actions (MPC)', yUnit: 'kW', height: 160, xFmt: xf, minSpan: 4, zero: true, series: [{ name: 'Battery charge(+)/discharge(−)', color: '--ctl' }, { name: 'Car charging', color: '--ctl', dash: [4, 3] }] });
+    const charts = [cA, cG, cB, cE, cC, cP];
 
-    const sc = CL.card(S.right, 'Safety status');
-    const statRows = {};
-    defs.forEach(d => { const r = el('div', { style: 'display:flex;align-items:center;gap:8px;margin:5px 0;font-size:.88rem' }); const b = el('span', { class: 'badge' }, '–'); const tx = el('span', { class: 'muted' }); r.append(el('i', { style: `width:12px;height:12px;border-radius:50%;background:var(${d.color});display:inline-block` }), el('span', { style: 'flex:1' }, d.name), b); sc.append(r, tx); statRows[d.key] = { b, tx }; });
-
-    const tc = CL.card(S.right, 'Build the scene (click the arena)');
-    const tool = CL.seg(tc, { options: [['goal', '🎯 Target'], ['add', '＋ Obstacle'], ['del', '✕ Remove'], ['start', '🤖 Start']], value: 'goal' });
-    const orad = CL.slider(tc, { label: 'New obstacle radius', min: .2, max: 1.2, step: .05, value: .5, dec: 2, unit: 'm' });
-    const show = {}; defs.forEach(d => show[d.key] = CL.check(tc, 'Show ' + d.name, true));
-    const tb = el('div', { class: 'btns' }); tc.append(tb);
-    CL.button(tb, '▶ Restart run', newRun, 'pri');
-    CL.button(tb, 'Random obstacles', () => { obs = []; for (let i = 0; i < 7; i++) { const o = { x: 2.5 + Math.random() * 7.5, y: .8 + Math.random() * 5.4, r: .3 + Math.random() * .6 }; if (Math.hypot(o.x - goal.x, o.y - goal.y) > o.r + .6 && Math.hypot(o.x - start.x, o.y - start.y) > o.r + .8) obs.push(o); } newRun(); });
-    CL.button(tb, 'Clear', () => { obs = []; newRun(); });
-    CL.button(tb, 'Narrow gap', () => { obs = [{ x: 6, y: 1.6, r: 1.25 }, { x: 6, y: 5.55, r: 1.25 }]; goal = { x: 11, y: 3.6 }; newRun(); });
-
-    const rc = CL.card(S.right, 'Robot and environment');
-    const vmax = CL.slider(rc, { label: 'Robot top speed', min: .2, max: 2.5, step: .1, value: 1.2, dec: 1, unit: 'm/s', color: '--ctl' });
-    const alpha = CL.slider(rc, { label: 'CBF aggressiveness α', min: .2, max: 5, step: .1, value: 1.5, dec: 1, color: '--ok', hint: 'Small α: start braking far from obstacles. Large α: allow approaching fast.' });
-    const noise = CL.slider(rc, { label: 'Position sensor noise σ', min: 0, max: .3, step: .01, value: .03, dec: 2, unit: 'm', color: '--err' });
-    const filt = CL.check(rc, 'State estimator (low-pass filter on measurements)', true);
-    const wind = CL.slider(rc, { label: 'Wind / slope drift', min: 0, max: .8, step: .05, value: 0, dec: 2, unit: 'm/s', color: '--err' });
-    const wdir = CL.slider(rc, { label: 'Drift direction', min: 0, max: 359, step: 1, value: 270, unit: '°', color: '--err', hint: '270° pushes downwards on screen' });
-    const dbound = CL.slider(rc, { label: 'Disturbance bound assumed by the robust robot', min: 0, max: 1, step: .05, value: .4, dec: 2, unit: 'm/s', color: '--ai' });
-    const nudge = CL.check(rc, 'Deadlock escape (small sideways bias)', true);
-    const kb = el('div', { class: 'btns' }); rc.append(kb);
-    CL.button(kb, '💥 Kick all robots', () => bots.forEach(b => { const a = Math.random() * 6.28; b.kick = [Math.cos(a) * 1.5, Math.sin(a) * 1.5]; }), 'warn');
-
+    const tc = CL.card(S.right, 'Score after 48 hours');
+    const Tt = CL.tiles(tc, [['cr', 'Bill: rules', '--muted'], ['cm', 'Bill: MPC', '--ai'], ['sv', 'Saving', '--ok'], ['ov', 'Overload h (R/M)', '--err'], ['pk', 'Peak kW (R/M)', '--sys'], ['ev', 'Car ready? (R/M)', '--ok']]);
+    const mc = CL.card(S.right, 'MPC settings');
+    const N = CL.slider(mc, { label: 'Prediction horizon N', min: 1, max: 24, step: 1, value: 12, unit: 'h', color: '--ai', hint: 'N = 1 is short-sighted. Longer horizons see tonight\'s peak price coming.' });
+    const fe = CL.slider(mc, { label: 'Solar forecast error', min: 0, max: 60, step: 5, value: 15, unit: '%', color: '--err' });
+    const wear = CL.slider(mc, { label: 'Battery wear cost', min: 0, max: 4, step: .25, value: 1, dec: 2, unit: '₹/kWh cycled', color: '--ctl' });
+    const sc = CL.card(S.right, 'Scenario');
+    const evNeed = CL.slider(sc, { label: 'Car needs (plugged in 6 pm, leaves 7 am)', min: 0, max: 40, step: 2, value: 30, unit: 'kWh', color: '--ok' });
+    const glim = CL.slider(sc, { label: 'Grid connection limit', min: 4, max: 12, step: .5, value: 7, dec: 1, unit: 'kW', color: '--err' });
+    const cloud = CL.slider(sc, { label: 'Day 2 cloud cover', min: 0, max: 90, step: 10, value: 60, unit: '%', color: '--err' });
+    const soc0 = CL.slider(sc, { label: 'Battery at start', min: 1, max: 10, step: .5, value: 5, dec: 1, unit: 'kWh', color: '--sys' });
+    [N, fe, wear, evNeed, glim, cloud, soc0].forEach(s => s.input.addEventListener('change', recompute));
     const ex = CL.card(S.right, 'What you are seeing', 'explain'); const exT = el('div'); ex.append(exT);
     CL.guide(S.right, [
-      { title: 'Reaching vs reaching safely', text: 'Press <b>Restart run</b>. The blue robot steers straight at the goal and drives through the obstacle (it does not even know it is there). Green and purple reach the goal <i>and</i> stay safe.', setup: () => { wind.set(0); noise.set(.03); newRun(); } },
-      { title: 'How the safety filter works', text: 'For each obstacle define h = distance² − (safe radius)². h ≥ 0 means safe. The filter makes the smallest change to the nominal command that keeps h from decreasing faster than α·h. Watch the “intervention” plot: zero when far away, positive near obstacles.' },
-      { title: 'Design your own course', text: 'Pick <b>＋ Obstacle</b> and click to place obstacles; pick <b>🎯 Target</b> to move the goal. Try a wall of obstacles across the path, or the <b>Narrow gap</b> preset.' },
-      { title: 'Add wind', text: 'Drift is now 0.5 m/s. The plain CBF robot assumed a perfect world, so the wind pushes it deep into the dashed safety zones (its clearance almost reaches zero). The robust robot budgets for disturbances up to 0.6 m/s and keeps a bigger buffer. Notice the price: it may refuse gaps the others squeeze through. Robustness costs performance. Also notice that all robots now stop short of the target: a purely proportional controller cannot cancel a constant push (remember the integral term?).', setup: () => { wind.set(.5); wdir.set(60); dbound.set(.6); newRun(); } },
-      { title: 'When the assumption is wrong', text: 'Set the drift to 0.8 m/s but leave the assumed bound at 0.6 m/s. Now even the robust robot can be pushed into an obstacle. Every guarantee holds only under its assumptions.', setup: () => { wind.set(.8); wdir.set(90); dbound.set(.6); newRun(); } },
-      { title: 'Noisy sensors', text: 'Raise sensor noise to 0.2 m and untick the estimator. Commands become jittery and safety erodes: you cannot be safe about a state you cannot measure well. Tick the estimator again.', setup: () => { noise.set(.2); filt.set(false); newRun(); } },
-      { title: 'Deadlock: an open research problem', text: 'Clear the arena, put one large obstacle exactly between start and goal, and untick deadlock escape. The safe robot may stop in front of it forever: safe, but useless. Safety filters can conflict with the task.', setup: () => { obs = [{ x: 6, y: 3.4, r: 1 }]; start = { x: 1, y: 3.4, phi: 0 }; goal = { x: 11, y: 3.4 }; nudge.set(false); wind.set(0); noise.set(0); newRun(); } },
+      { title: 'The rule-based controller', text: 'Grey lines follow simple rules: charge the car at full power as soon as it is plugged in; charge the battery from surplus solar; discharge it whenever the house needs power. Sensible, but blind to the future.' },
+      { title: 'MPC looks ahead', text: 'Purple lines come from MPC. Scrub to the afternoon of day 1: the dotted purple line is the <b>plan</b> MPC made at that hour. It saves battery energy for the expensive 5–10 pm peak and charges the car after 10 pm, when power is cheap.', setup: () => { setHour(15); } },
+      { title: 'Receding horizon', text: 'Press play and watch the dotted plan: it is recomputed <i>every hour</i> with new measurements. The plan is never executed in full — only its first step. That is what makes MPC a feedback controller.' },
+      { title: 'Constraints are first-class citizens', text: 'Reduce the grid limit to 5 kW. Charging the car at full power on top of the evening load overloads the connection (red hours). MPC spreads the charging out because the limit is part of its optimisation problem.', setup: () => { glim.set(5); recompute(); } },
+      { title: 'Short-sighted vs far-sighted', text: 'Set the horizon to 1 h, then 6 h, then 24 h. Watch the saving grow. With a short horizon MPC cannot “see” the evening peak or the departure deadline.', setup: () => { N.set(1); recompute(); } },
+      { title: 'Bad forecasts', text: 'Increase the forecast error to 60 %. MPC is only as good as its predictions, but because it re-plans every hour it still corrects many mistakes. This is the price and power of model-based control.', setup: () => { N.set(12); fe.set(60); recompute(); } },
     ]);
-    S.resetB.onclick = () => { obs = [{ x: 6, y: 3.5, r: 0.9 }, { x: 8.6, y: 2.2, r: 0.6 }, { x: 8.8, y: 5.0, r: 0.55 }, { x: 3.8, y: 5.6, r: 0.5 }]; goal = { x: 11, y: 3.6 }; start = { x: 1, y: 3.4, phi: 0 }; newRun(); };
-    newRun();
+    S.resetB.onclick = () => { N.set(12); fe.set(15); wear.set(1); evNeed.set(30); glim.set(7); cloud.set(60); soc0.set(5); recompute(); setHour(0); };
 
-    let geo = { s: 1, ox: 0, oy: 0 };
-    cv.cv.addEventListener('pointerdown', e => {
-      const r = cv.cv.getBoundingClientRect(); const X = (e.clientX - r.left - geo.ox) / geo.s, Y = H - (e.clientY - r.top - geo.oy) / geo.s;
-      if (X < 0 || X > W || Y < 0 || Y > H) return;
-      const tl = tool.get();
-      if (tl === 'goal') { goal = { x: X, y: Y }; bots.forEach(b => b.done = null); }
-      else if (tl === 'add') obs.push({ x: X, y: Y, r: orad.get() });
-      else if (tl === 'del') { let bi = -1, bd = 1e9; obs.forEach((o, i) => { const d = Math.hypot(o.x - X, o.y - Y) - o.r; if (d < bd) { bd = d; bi = i; } }); if (bi >= 0 && bd < .5) obs.splice(bi, 1); }
-      else if (tl === 'start') { start = { x: X, y: Y, phi: Math.atan2(goal.y - Y, goal.x - X) }; newRun(); }
-    });
-
-    function qp(un, A, B) { // Hildreth: min |u-un|^2 s.t. A_i·u >= B_i
-      const lam = A.map(() => 0); let u = un.slice();
-      for (let it = 0; it < 60; it++) {
-        let chg = 0;
-        for (let i = 0; i < A.length; i++) {
-          const a = A[i], n2 = a[0] * a[0] + a[1] * a[1]; if (n2 < 1e-9) continue;
-          const viol = B[i] - (a[0] * u[0] + a[1] * u[1]);
-          const nl = Math.max(0, lam[i] + viol / n2), d = nl - lam[i];
-          if (d !== 0) { lam[i] = nl; u[0] += d * a[0]; u[1] += d * a[1]; chg += Math.abs(d); }
+    let R = null, hour = 0;
+    function profiles() {
+      seed = 11; const pv = [], pvF = [], ld = [];
+      const cl = cloud.get() / 100;
+      for (let h = 0; h < HRS + 24; h++) {
+        const day2 = h >= 24 && h < 48; const c = day2 ? (1 - cl * (0.7 + 0.3 * rnd())) : (0.92 + 0.08 * rnd());
+        pv.push(pvClear(h) * c); ld.push(loadP(h) * (0.9 + 0.2 * rnd()));
+      }
+      const fseeds = []; for (let k = 0; k < HRS; k++) { const row = []; for (let j = 0; j < 24; j++) row.push((rnd() * 2 - 1)); fseeds.push(row); }
+      return { pv, ld, fseeds };
+    }
+    function stageGrid(load, pv, dB, ev) { return load + ev + (dB > 0 ? dB / ETA : dB * ETA) - pv; }
+    function stageCost(h, g, dB) { const lim = glim.get(); let c = g >= 0 ? g * price(h) : g * EXP; if (g > lim) c += (g - lim) * 200; return c + Math.abs(dB) * wear.get(); }
+    function solveDP(k, b0, e0, P) { // returns first action and plan
+      const n = Math.min(N.get(), HRS - k); const need = evNeed.get(), NE = Math.round(need / EVSTEP) + 1;
+      const err = fe.get() / 100;
+      const pvF = j => Math.max(0, P.pv[k + j] * (j === 0 ? 1 : (1 + err * P.fseeds[k][j])));
+      const ldF = j => j === 0 ? P.ld[k] : loadP(k + j);
+      let V = new Float64Array(NB * NE);
+      for (let b = 0; b < NB; b++) for (let e = 0; e < NE; e++) {
+        let c = -b * BSTEP * 6.5; // terminal value of stored energy
+        const hEnd = k + n, rem = need - e * EVSTEP;
+        if (hEnd <= DEPART && hEnd > PLUG) { const left = DEPART - hEnd; if (rem > left * EVP[EVP.length - 1] + 1e-9) c += 1e5; else c += rem * 5; }
+        else if (hEnd > DEPART && rem > 1e-9 && k < DEPART) c += 1e5;
+        V[b * NE + e] = c;
+      }
+      const pol = [];
+      for (let j = n - 1; j >= 0; j--) {
+        const h = k + j, Vn = new Float64Array(NB * NE).fill(Infinity), A = new Int16Array(NB * NE * 2);
+        const plugged = h >= PLUG && h < DEPART, pv = pvF(j), ld = ldF(j);
+        for (let b = 0; b < NB; b++) for (let e = 0; e < NE; e++) {
+          let best = Infinity, ba = 0, bev = 0;
+          for (let db = -6; db <= 6; db++) { const b2 = b + db; if (b2 < 0 || b2 >= NB) continue; const dB = db * BSTEP;
+            for (let a = 0; a < (plugged ? EVP.length : 1); a++) { const e2 = Math.min(NE - 1, e + EVP[a] / EVSTEP); const evE = (e2 - e) * EVSTEP;
+              const g = stageGrid(ld, pv, dB, evE); const c = stageCost(h, g, dB) + V[b2 * NE + e2];
+              if (c < best) { best = c; ba = db; bev = e2 - e; } } }
+          Vn[b * NE + e] = best; A[(b * NE + e) * 2] = ba; A[(b * NE + e) * 2 + 1] = bev;
         }
-        if (chg < 1e-7) break;
+        pol[j] = A; V = Vn;
       }
-      return u;
+      // roll out plan
+      let b = b0, e = e0; const plan = [b * BSTEP];
+      let first = null;
+      for (let j = 0; j < n; j++) { const i = (b * NE + e) * 2; const db = pol[j][i], de = pol[j][i + 1]; if (j === 0) first = [db, de]; b += db; e += de; plan.push(b * BSTEP); }
+      return { first, plan };
     }
-    function stepBot(b, dvec) {
-      const pTrue = [b.x + ELL * Math.cos(b.phi), b.y + ELL * Math.sin(b.phi)];
-      const meas = [pTrue[0] + noise.get() * randn(), pTrue[1] + noise.get() * randn()];
-      if (!b.est || !filt.get()) b.est = meas.slice(); else { const k = 0.12; b.est[0] += k * (meas[0] - b.est[0]); b.est[1] += k * (meas[1] - b.est[1]); }
-      const p = b.est;
-      const ex = goal.x - p[0], ey = goal.y - p[1], dg = Math.hypot(ex, ey);
-      let un = [1.2 * ex, 1.2 * ey]; const nn = Math.hypot(...un); if (nn > vmax.get()) un = un.map(c => c * vmax.get() / nn);
-      if (dg < 0.12) un = [0, 0];
-      let u = un;
-      if (b.key !== 'nom' && obs.length) {
-        const A = [], B = [];
-        const sig = filt.get() ? noise.get() * 0.5 : noise.get();
-        let nearest = null, nd = 1e9;
-        obs.forEach(o => {
-          const R = o.r + RR + ELL + 0.05 + (b.key === 'rob' ? 2 * sig : 0);
-          const dx = p[0] - o.x, dy = p[1] - o.y, hh = dx * dx + dy * dy - R * R;
-          const a = [2 * dx, 2 * dy]; let rhs = -alpha.get() * hh;
-          if (b.key === 'rob') rhs += Math.hypot(a[0], a[1]) * dbound.get();
-          A.push(a); B.push(rhs);
-          if (hh < nd) { nd = hh; nearest = a; }
-        });
-        if (nudge.get() && nearest && dg > 0.5) { const s = Math.exp(-Math.max(0, nd) / 1.5) * 0.35 * vmax.get(); const nr = Math.hypot(...nearest) || 1; un = [un[0] - nearest[1] / nr * s, un[1] + nearest[0] / nr * s]; }
-        u = qp(un, A, B);
-        const n2 = Math.hypot(...u), lim = vmax.get() * 1.15; if (n2 > lim) u = u.map(c => c * lim / n2);
+    function recompute() {
+      const P = profiles(); const need = evNeed.get(); const NE = Math.round(need / EVSTEP) + 1; const lim = glim.get();
+      const out = { rule: { g: [], b: [], e: [], c: [], ov: 0, pk: 0 }, mpc: { g: [], b: [], e: [], c: [], ov: 0, pk: 0, db: [], ev: [], plans: [] }, P };
+      // rule-based
+      let b = soc0.get(), e = 0, cost = 0;
+      for (let h = 0; h < HRS; h++) {
+        const plugged = h >= PLUG && h < DEPART; const ev = plugged ? Math.min(7.2, need - e) : 0; e += ev;
+        const net = P.ld[h] + ev - P.pv[h]; let dB = 0;
+        if (net < 0) dB = Math.min(-net * ETA, 3.3, BCAP * .95 - b); else dB = -Math.min(net / ETA, 3.3, b - BCAP * .1);
+        dB = Math.max(dB, -b); b += dB;
+        const g = stageGrid(P.ld[h], P.pv[h], dB, ev); cost += (g >= 0 ? g * price(h) : g * EXP) + Math.abs(dB) * wear.get();
+        if (g > lim + 1e-6) out.rule.ov++; out.rule.pk = Math.max(out.rule.pk, g);
+        out.rule.g.push(g); out.rule.b.push(b); out.rule.e.push(e); out.rule.c.push(cost);
       }
-      b.u = u; b.un = un;
-      // unicycle conversion
-      let v = Math.cos(b.phi) * u[0] + Math.sin(b.phi) * u[1];
-      let w = (-Math.sin(b.phi) * u[0] + Math.cos(b.phi) * u[1]) / ELL;
-      v = clamp(v, -vmax.get() * 1.2, vmax.get() * 1.2); w = clamp(w, -4, 4); b.v = v; b.w = w;
-      b.x += (v * Math.cos(b.phi) + dvec[0] + b.kick[0]) * DT; b.y += (v * Math.sin(b.phi) + dvec[1] + b.kick[1]) * DT; b.phi += w * DT;
-      b.kick = b.kick.map(c => c * 0.9);
-      b.x = clamp(b.x, RR, W - RR); b.y = clamp(b.y, RR, H - RR);
-      // collisions (body)
-      let minc = Infinity, hit = false;
-      obs.forEach(o => { const d = Math.hypot(b.x - o.x, b.y - o.y) - o.r - RR; minc = Math.min(minc, d); if (d < 0) { hit = true; } });
-      if (hit && !b.inCol) b.col++; b.inCol = hit; b.clear = minc; b.minC = Math.min(b.minC, minc);
-      b.dg = Math.hypot(goal.x - b.x, goal.y - b.y);
-      if (b.done == null && b.dg < 0.4) b.done = t;
-      b.trail.push([b.x, b.y, hit]); if (b.trail.length > 1500) b.trail.shift();
+      out.rule.ready = e >= need - 1e-6;
+      // MPC
+      let bi = Math.round(soc0.get() / BSTEP), ei = 0; cost = 0;
+      for (let h = 0; h < HRS; h++) {
+        const { first, plan } = solveDP(h, bi, ei, P);
+        const dB = first[0] * BSTEP, ev = first[1] * EVSTEP; bi += first[0]; ei = Math.min(NE - 1, ei + first[1]);
+        const g = stageGrid(P.ld[h], P.pv[h], dB, ev); cost += (g >= 0 ? g * price(h) : g * EXP) + Math.abs(dB) * wear.get();
+        if (g > lim + 1e-6) out.mpc.ov++; out.mpc.pk = Math.max(out.mpc.pk, g);
+        out.mpc.g.push(g); out.mpc.b.push(bi * BSTEP); out.mpc.e.push(ei * EVSTEP); out.mpc.c.push(cost); out.mpc.db.push(dB); out.mpc.ev.push(ev); out.mpc.plans.push(plan);
+      }
+      out.mpc.ready = ei * EVSTEP >= need - 1e-6;
+      R = out; render();
     }
-    let acc = 0, pushT = -1;
+    function render() {
+      if (!R) return; const xs = [...Array(HRS).keys()].map(i => i + 0.5), xs1 = xs.map(x => x + 0.5);
+      const P = R.P, err = fe.get() / 100;
+      const pvF = xs.map((_, h) => h < hour ? null : Math.max(0, P.pv[h] * (h === hour ? 1 : 1 + err * P.fseeds[hour][Math.min(23, h - hour)])));
+      cA.setData(xs, [P.pv.slice(0, HRS), pvF.map((v, h) => h - hour < N.get() ? v : null), P.ld.slice(0, HRS), xs.map((_, h) => price(h))]);
+      cG.setData(xs, [R.rule.g, R.mpc.g]); cG.extra = [{ y: glim.get(), color: '--err', label: 'grid limit' }];
+      const plan = R.mpc.plans[hour], pl = xs1.map((_, h) => h >= hour && h - hour < plan.length - 1 ? plan[h - hour + 1] : null);
+      cB.setData(xs1, [R.rule.b, R.mpc.b, pl]);
+      cE.setData(xs1, [R.rule.e, R.mpc.e, xs1.map(x => x <= DEPART + .5 && x >= PLUG ? evNeed.get() : null)]);
+      cC.setData(xs1, [R.rule.c, R.mpc.c]); cP.setData(xs, [R.mpc.db, R.mpc.ev]);
+      charts.forEach(c => { c.vline = hour + 0.5; c.draw([0, HRS]); });
+      const cr = R.rule.c[HRS - 1], cm = R.mpc.c[HRS - 1];
+      Tt.set('cr', '₹' + cr.toFixed(0)); Tt.set('cm', '₹' + cm.toFixed(0)); Tt.set('sv', (cr > 0 ? ((cr - cm) / cr * 100).toFixed(0) + ' %' : '₹' + (cr - cm).toFixed(0)));
+      Tt.set('ov', R.rule.ov + ' / ' + R.mpc.ov); Tt.set('pk', R.rule.pk.toFixed(1) + ' / ' + R.mpc.pk.toFixed(1)); Tt.set('ev', (R.rule.ready ? '✓' : '✗') + ' / ' + (R.mpc.ready ? '✓' : '✗'));
+      const d = Math.floor(hour / 24) + 1; hourL.textContent = `Day ${d}, ${String(hour % 24).padStart(2, '0')}:00–${String((hour % 24) + 1).padStart(2, '0')}:00 · ₹${price(hour)}/kWh`;
+      const m = [];
+      const hh = hour % 24;
+      if (hh >= 17 && hh < 22) m.push('Peak price hours. MPC drains the battery it saved earlier; the rule-based battery may already be empty.');
+      if (hour >= PLUG && hour < DEPART) m.push(R.mpc.ev[hour] > 0 ? `MPC is charging the car at ${R.mpc.ev[hour]} kW now${price(hour) <= 5 ? ' — cheap night power' : ''}.` : 'The car is plugged in, but MPC waits: its plan finishes charging later, at lower prices, still before 7 am.');
+      if (R.rule.g[hour] > glim.get()) m.push(`<span style="color:var(--err)">The rule-based home is drawing ${R.rule.g[hour].toFixed(1)} kW, above the ${glim.get()} kW limit.</span>`);
+      if (N.get() < 4) m.push('With such a short horizon, MPC behaves almost like a greedy rule: it cannot anticipate.');
+      m.push(`<span class="muted">Profiles are illustrative (5 kWp solar, 10 kWh battery, 6–7 kW charger, ₹5 / 7.5 / 11 time-of-use tariff, ₹3 export). MPC is solved exactly by dynamic programming on a grid.</span>`);
+      exT.innerHTML = m.map(s => `<p>${s}</p>`).join('');
+    }
+    function setHour(h) { hour = clamp(h, 0, HRS - 1); hourS.value = hour; render(); }
+    hourS.oninput = () => { playing = false; playB.textContent = '▶ Play'; setHour(+hourS.value); };
+    recompute();
+    let acc = 0, ph = 0;
     const L = CL.loop((rdt, paused) => {
-      if (!paused) {
-        acc += rdt;
-        while (acc >= DT) {
-          const a = wdir.get() * Math.PI / 180, dv = [wind.get() * Math.cos(a), wind.get() * Math.sin(a)];
-          bots.forEach(b => stepBot(b, dv)); t += DT; acc -= DT;
-        }
-      }
-      if (t - pushT > .05) {
-        pushT = t;
-        const vis = k => show[k].get();
-        cC.push(t, bots.map(b => vis(b.key) && isFinite(b.clear) ? b.clear : null)); cE.push(t, bots.map(b => vis(b.key) ? b.dg : null));
-        cU.push(t, bots.map(b => vis(b.key) ? Math.hypot(...b.u) : null)); cH.push(t, bots.map(b => vis(b.key) && b.un ? Math.hypot(b.u[0] - b.un[0], b.u[1] - b.un[1]) : null));
-      }
-      charts.forEach(c => c.draw()); draw(); status();
+      if (playing && !paused) { acc += rdt; if (acc > 0.7) { acc = 0; setHour((hour + 1) % HRS); } }
+      ph += rdt; draw();
     }, S.pauseB);
 
     function draw() {
-      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
-      const s = Math.min(w / W, h / H); const ox = (w - W * s) / 2, oy = (h - H * s) / 2; geo = { s, ox, oy };
-      const X = x => ox + x * s, Y = y => oy + (H - y) * s;
-      ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1;
-      for (let i = 0; i <= W; i++) { ctx.beginPath(); ctx.moveTo(X(i), Y(0)); ctx.lineTo(X(i), Y(H)); ctx.stroke(); }
-      for (let j = 0; j <= H; j++) { ctx.beginPath(); ctx.moveTo(X(0), Y(j)); ctx.lineTo(X(W), Y(j)); ctx.stroke(); }
-      ctx.strokeStyle = css('--muted'); ctx.lineWidth = 2; ctx.strokeRect(X(0), Y(H), W * s, H * s);
-      // obstacles + safety halo
-      obs.forEach(o => {
-        ctx.fillStyle = CL.alpha(css('--err'), .12); ctx.beginPath(); ctx.arc(X(o.x), Y(o.y), (o.r + RR + ELL + .05) * s, 0, 7); ctx.fill();
-        ctx.setLineDash([4, 4]); ctx.strokeStyle = CL.alpha(css('--err'), .5); ctx.stroke(); ctx.setLineDash([]);
-        ctx.fillStyle = CL.alpha(css('--err'), .75); ctx.beginPath(); ctx.arc(X(o.x), Y(o.y), o.r * s, 0, 7); ctx.fill();
-      });
-      // drift arrow
-      if (wind.get() > 0) { const a = wdir.get() * Math.PI / 180; const cx = X(W - 1), cy = Y(H - 1); CL.arrow(ctx, cx - Math.cos(a) * 25, cy + Math.sin(a) * 25, cx + Math.cos(a) * 25, cy - Math.sin(a) * 25, css('--err'), 3); ctx.fillStyle = css('--err'); ctx.font = '600 11px Inter'; ctx.textAlign = 'center'; ctx.fillText('drift', cx, cy + 40); }
-      // goal
-      ctx.strokeStyle = css('--ok'); ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(X(goal.x), Y(goal.y), .4 * s, 0, 7); ctx.stroke();
-      ctx.beginPath(); ctx.arc(X(goal.x), Y(goal.y), .15 * s, 0, 7); ctx.fillStyle = css('--ok'); ctx.fill();
-      ctx.font = '600 12px Inter'; ctx.textAlign = 'center'; ctx.fillText('target', X(goal.x), Y(goal.y) - .5 * s);
-      ctx.fillStyle = css('--muted'); ctx.fillText('start', X(start.x), Y(start.y) + .55 * s);
-      bots.forEach(b => {
-        if (!show[b.key].get()) return;
-        const col = css(b.color);
-        ctx.lineWidth = 2.5; ctx.strokeStyle = col; ctx.globalAlpha = .8; ctx.beginPath();
-        b.trail.forEach((p, i) => i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1]))); ctx.stroke(); ctx.globalAlpha = 1;
-        b.trail.forEach(p => { if (p[2]) { ctx.fillStyle = css('--err'); ctx.fillRect(X(p[0]) - 2, Y(p[1]) - 2, 4, 4); } });
-        ctx.save(); ctx.translate(X(b.x), Y(b.y)); ctx.rotate(-b.phi);
-        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, 0, RR * s, 0, 7); ctx.fill();
-        if (b.inCol) { ctx.strokeStyle = css('--err'); ctx.lineWidth = 4; ctx.stroke(); }
-        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(RR * s * .9, 0); ctx.lineTo(-RR * s * .3, RR * s * .45); ctx.lineTo(-RR * s * .3, -RR * s * .45); ctx.fill();
-        ctx.restore();
-        if (b.est && noise.get() > 0) { ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(X(b.est[0]), Y(b.est[1]), 3, 0, 7); ctx.stroke(); }
-      });
-      ctx.textAlign = 'left'; ctx.fillStyle = css('--muted'); ctx.font = '12px Inter'; ctx.fillText(`t = ${t.toFixed(1)} s   •   tool: ${tool.get()}   •   dashed ring = safety zone used by the filter`, X(0) + 8, Y(0) - 8);
-    }
-    let lastS = 0;
-    function status() {
-      if (performance.now() - lastS < 300) return; lastS = performance.now();
-      bots.forEach(b => {
-        const r = statRows[b.key]; let lab, c;
-        if (b.inCol) { lab = 'COLLISION'; c = '--err'; } else if (b.clear < .15) { lab = 'CAUTION'; c = '--warn'; } else { lab = 'SAFE'; c = '--ok'; }
-        r.b.textContent = lab; r.b.style.background = CL.alpha(css(c), .18); r.b.style.color = css(c);
-        r.tx.textContent = `collisions ${b.col} · min clearance ${isFinite(b.minC) ? b.minC.toFixed(2) + ' m' : '–'} · ${b.done != null ? 'reached goal at ' + b.done.toFixed(1) + ' s' : 'distance to goal ' + b.dg?.toFixed(1) + ' m'}`;
-        r.tx.style.cssText = 'display:block;font-size:.78rem;margin:-2px 0 6px 20px';
-      });
-      const [n, c, r] = bots, m = [];
-      if (n.col > 0) m.push(`The <b>nominal</b> robot has collided ${n.col}× — it optimises one objective (reach the goal) and nothing else.`);
-      if (c.minC < 0 && wind.get() > 0) m.push('The <b>CBF</b> robot assumed no disturbance, so the drift pushed it inside the obstacle margin. A safety guarantee is only as good as its model.');
-      else if (c.col === 0 && obs.length) m.push('The <b>CBF</b> robot only modifies the command when an obstacle is close; elsewhere it behaves exactly like the nominal one.');
-      if (r.col === 0 && wind.get() > 0) m.push(`The <b>robust</b> robot keeps a larger buffer because it assumes disturbances up to ${dbound.get()} m/s. ${dbound.get() < wind.get() ? '<span style="color:var(--err)">But the true drift is larger than its assumed bound — its guarantee no longer holds.</span>' : 'Its price: longer, slower paths.'}`);
-      if (wind.get() > 0 && c.done == null && c.dg < 1.5) m.push('Under drift, the robots settle short of the target: proportional control leaves a <b>steady-state error</b> against a constant disturbance.');
-      if (r.done == null && t > 15 && r.dg > 2 && r.col === 0) m.push('The robust robot is being very cautious: with its larger margins, some gaps look too narrow. That is the price of robustness.');
-      if (c.done == null && t > 25 && c.dg > 1.5) m.push('The safe robot is stuck: the safety constraint and the goal pull in opposite directions (a <b>deadlock</b>).');
-      exT.innerHTML = m.map(s => `<p>${s}</p>`).join('') || '<p>Click the arena to move the target or add obstacles, then restart the run.</p>';
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h); if (!R) return;
+      const P = R.P, k = hour, hh = k % 24;
+      const night = hh < 6 || hh >= 19; const sky = ctx.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, night ? 'rgba(20,30,70,.5)' : CL.alpha(css('--sys'), .25)); sky.addColorStop(1, 'transparent'); ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+      const half = w / 2;
+      const panel = (x0, title, g, dB, ev, col) => {
+        ctx.fillStyle = col; ctx.font = '700 15px "Space Grotesk",Inter'; ctx.textAlign = 'center'; ctx.fillText(title, x0 + half / 2, 22);
+        const cx = x0 + half / 2, cy = h * 0.56, s = Math.min(half / 360, h / 230);
+        // house
+        ctx.fillStyle = css('--panel'); ctx.strokeStyle = css('--muted'); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(cx - 55 * s, cy - 10 * s); ctx.lineTo(cx, cy - 55 * s); ctx.lineTo(cx + 55 * s, cy - 10 * s); ctx.lineTo(cx + 45 * s, cy - 10 * s); ctx.lineTo(cx + 45 * s, cy + 45 * s); ctx.lineTo(cx - 45 * s, cy + 45 * s); ctx.lineTo(cx - 45 * s, cy - 10 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = css('--sys'); ctx.font = `600 ${11 * s + 2}px Inter`; ctx.fillText(`home ${P.ld[k].toFixed(1)} kW`, cx, cy + 20 * s);
+        const node = (x, y, lab, val, c) => { ctx.fillStyle = css(c); ctx.beginPath(); ctx.arc(x, y, 20 * s, 0, 7); ctx.globalAlpha = .2; ctx.fill(); ctx.globalAlpha = 1; ctx.font = `600 ${10 * s + 2}px Inter`; ctx.fillText(lab, x, y - 25 * s); ctx.font = `700 ${11 * s + 3}px "Space Grotesk"`; ctx.fillText(val, x, y + 5 * s); };
+        const flow = (x0, y0, x1, y1, p, c) => { if (Math.abs(p) < 0.05) { ctx.strokeStyle = css('--grid'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); return; }
+          const [a, b2, c2, d] = p > 0 ? [x0, y0, x1, y1] : [x1, y1, x0, y0]; ctx.strokeStyle = css(c); ctx.lineWidth = 2 + Math.abs(p) * 1.2; ctx.setLineDash([8, 8]); ctx.lineDashOffset = -ph * 40; ctx.beginPath(); ctx.moveTo(a, b2); ctx.lineTo(c2, d); ctx.stroke(); ctx.setLineDash([]); };
+        const sunX = cx - 120 * s, sunY = cy - 50 * s, gX = cx + 130 * s, gY = cy - 40 * s, bX = cx - 120 * s, bY = cy + 55 * s, eX = cx + 130 * s, eY = cy + 55 * s;
+        flow(sunX, sunY, cx - 45 * s, cy - 5 * s, P.pv[k], '--warn'); node(sunX, sunY, 'solar', P.pv[k].toFixed(1), '--warn');
+        flow(gX, gY, cx + 45 * s, cy - 5 * s, g, g > glim.get() ? '--err' : '--sys'); node(gX, gY, 'grid ₹' + price(k), (g >= 0 ? '+' : '') + g.toFixed(1), g > glim.get() ? '--err' : '--sys');
+        flow(cx - 45 * s, cy + 35 * s, bX, bY, dB, '--ctl'); node(bX, bY, 'battery', (dB >= 0 ? '+' : '') + dB.toFixed(1), '--ctl');
+        flow(cx + 45 * s, cy + 35 * s, eX, eY, ev, '--ctl'); node(eX, eY, k >= PLUG && k < DEPART ? 'car 🔌' : 'car (away)', ev.toFixed(1), '--ctl');
+      };
+      panel(0, 'Rule-based', R.rule.g[k], R.rule.b[k] - (k ? R.rule.b[k - 1] : soc0.get()), k >= PLUG && k < DEPART ? R.rule.e[k] - (k ? R.rule.e[k - 1] : 0) : 0, css('--muted'));
+      panel(half, 'Model Predictive Control', R.mpc.g[k], R.mpc.db[k], R.mpc.ev[k], css('--ai'));
+      ctx.strokeStyle = css('--line'); ctx.beginPath(); ctx.moveTo(half, 30); ctx.lineTo(half, h - 10); ctx.stroke();
+      ctx.font = '600 13px Inter'; ctx.textAlign = 'left'; ctx.fillStyle = css('--muted'); ctx.fillText(`Day ${Math.floor(k / 24) + 1}  ${String(hh).padStart(2, '0')}:00   (kW)`, 10, h - 10);
     }
     return { stop: L.stop };
   }
 };
 
-CL.initTheme(); APPS['robot'].mount(document.getElementById('root'), false);</script>
+CL.initTheme(); APPS['energy'].mount(document.getElementById('root'), false);</script>
 <script>/* link back to the main website */
 (function () {
   var a = document.createElement('a');

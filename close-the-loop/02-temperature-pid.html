@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Control Lab – energy</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"><style>:root{
+<title>Temperature Control: P, I and D · Close the Loop</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"><style>:root{
   --bg:#0b1020;--panel:#121a30;--panel2:#18223d;--ink:#e8edf7;--muted:#9aa7c2;--line:#26324f;--grid:#1d2742;
   --sys:#4da3ff;--ctl:#ff9f43;--ok:#2ecc71;--err:#ff5d5d;--ai:#b48cff;--warn:#ffd166;
   --radius:14px;font-size:16px;color-scheme:dark;
@@ -325,194 +325,165 @@ const CL = (() => {
   return { css, clamp, el, randn, shell, card, slider, seg, check, button, tiles, guide, canvasIn, Chart, loop, arrow, rrect, alpha, initTheme, setTheme };
 })();
 </script>
-<script>APPS.energy = {
-  title: 'Smart Home Energy Manager: Rules vs Model Predictive Control', concept: 'Optimisation and predictive control', audience: 'Advanced', color: '--ai',
-  blurb: 'A home with rooftop solar, a battery and an electric car on a time-of-use tariff. A simple rule-based controller competes with MPC, which re-plans every hour using forecasts.',
+<script>APPS.thermo = {
+  title: 'Temperature Control Lab: P, I and D', concept: 'PID control', audience: 'School / UG', color: '--ctl',
+  blurb: 'Heat or cool a water bath with a delayed, noisy sensor. Compare an on–off thermostat with P, PI and PID, and watch the three terms work.',
   mount(root, back) {
-    const { css, clamp, el } = CL;
-    const S = CL.shell(root, { back, title: this.title, subtitle: 'MPC: at every hour, optimise the next N hours using forecasts → apply only the first decision → measure → repeat', tag: this.concept, audience: this.audience, color: this.color });
-    const HRS = 48, BCAP = 10, BSTEP = 0.5, NB = Math.round(BCAP / BSTEP) + 1, ETA = 0.95, EVSTEP = 2, EVP = [0, 2, 4, 6], PLUG = 18, DEPART = 31, EXP = 3;
-    const price = h => { const hh = h % 24; return hh >= 22 || hh < 6 ? 5 : hh >= 17 ? 11 : 7.5; };
-    const loadP = h => { const hh = h % 24; return 0.55 + 1.3 * Math.exp(-((hh - 8) ** 2) / 3) + 2.4 * Math.exp(-((hh - 20.5) ** 2) / 4) + 0.35 * Math.exp(-((hh - 13) ** 2) / 8) + (h >= 24 ? 0.1 : 0); };
-    const pvClear = h => { const hh = h % 24; return hh <= 6 || hh >= 18 ? 0 : 5 * Math.pow(Math.sin(Math.PI * (hh - 6) / 12), 1.4); };
-    let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const { css, clamp, el, randn } = CL;
+    const S = CL.shell(root, { back, title: this.title, subtitle: 'u(t) = Kp·e(t) + Ki·∫e dt + Kd·de/dt   — present, past and future of the error', tag: this.concept, audience: this.audience, color: this.color });
+    const K = 50, TAU = 60, SPEED = 6; // °C gain at full power, time constant (s), playback speed
+    let st;
+    const reset = () => {
+      st = { t: 0, T: amb.get(), I: 0, buf: [], dF: 0, prevY: amb.get(), u: 0, up: 0, ui: 0, ud: 0, onoff: 0, spT: 0, spV: sp.get(), peak: -1e9, settle: null, iae: 0, energy: 0, start: amb.get() };
+      charts.forEach(c => c.clear());
+    };
+    const vis = el('div', { class: 'visual' }); S.left.append(vis); const cv = CL.canvasIn(vis);
+    const pl = el('div', { class: 'plots' }); S.left.append(pl);
+    const cT = new CL.Chart(pl, { title: 'Temperature', yUnit: '°C', window: 300, minSpan: 6, series: [{ name: 'Setpoint', color: '--ok', dash: [6, 4] }, { name: 'Measured', color: '--sys', width: 1.2, alpha: .55 }, { name: 'True', color: '--sys' }] });
+    const cU = new CL.Chart(pl, { title: 'Control effort (heater + / cooler −)', yUnit: '%', window: 300, yMin: -110, yMax: 110, zero: true, height: 140, series: [{ name: 'Total (after limits)', color: '--ctl', width: 2.5 }, { name: 'P', color: '--sys', width: 1.3 }, { name: 'I', color: '--ai', width: 1.3 }, { name: 'D', color: '--ok', width: 1.3 }] });
+    const charts = [cT, cU];
+    const tl = CL.card(S.right, 'Performance since last setpoint change');
+    const T = CL.tiles(tl, [['os', 'Overshoot', '--err'], ['ts', 'Settling time', '--sys'], ['ss', 'Error now', '--err'], ['en', 'Energy used', '--ctl']]);
 
-    const vis = el('div', { class: 'visual', style: 'aspect-ratio:16/6.4' }); S.left.append(vis); const cv = CL.canvasIn(vis);
-    const tr = el('div', { class: 'card' }); S.left.append(tr);
-    const playRow = el('div', { class: 'btns', style: 'align-items:center' }); tr.append(playRow);
-    let playing = true; const playB = CL.button(playRow, '❚❚ Pause playback', () => { playing = !playing; playB.textContent = playing ? '❚❚ Pause playback' : '▶ Play'; });
-    const hourS = el('input', { type: 'range', min: 0, max: HRS - 1, step: 1, value: 0, style: 'flex:1;min-width:200px' }); playRow.append(hourS);
-    const hourL = el('b', { style: 'min-width:150px' }); playRow.append(hourL);
-    const pl = el('div', { class: 'plots two' }); S.left.append(pl);
-    const xf = x => { const d = Math.floor(x / 24) + 1, hh = Math.round(x % 24); return hh === 0 ? 'Day ' + d : hh + 'h'; };
-    const cA = new CL.Chart(pl, { title: 'Solar & load (kW), price (₹/kWh)', yUnit: '', height: 160, xFmt: xf, minSpan: 4, yMin: 0, series: [{ name: 'Solar (actual)', color: '--warn' }, { name: 'Solar forecast', color: '--warn', dash: [4, 4], alpha: .7 }, { name: 'Load', color: '--sys' }, { name: 'Price', color: '--err', width: 1.5, alpha: .8 }] });
-    const cG = new CL.Chart(pl, { title: 'Grid import (+) / export (−)', yUnit: 'kW', height: 160, xFmt: xf, minSpan: 4, zero: true, series: [{ name: 'Rule-based', color: '--muted' }, { name: 'MPC', color: '--ai' }] });
-    const cB = new CL.Chart(pl, { title: 'Home battery state of charge', yUnit: 'kWh', height: 160, xFmt: xf, yMin: 0, yMax: BCAP, series: [{ name: 'Rule-based', color: '--muted' }, { name: 'MPC', color: '--ai' }, { name: 'MPC plan', color: '--ai', dash: [3, 3], width: 3, alpha: .6 }] });
-    const cE = new CL.Chart(pl, { title: 'Electric car: energy charged', yUnit: 'kWh', height: 160, xFmt: xf, yMin: 0, series: [{ name: 'Rule-based', color: '--muted' }, { name: 'MPC', color: '--ai' }, { name: 'Needed by 7am', color: '--ok', dash: [6, 4] }] });
-    const cC = new CL.Chart(pl, { title: 'Cumulative electricity bill', yUnit: '₹', height: 160, xFmt: xf, minSpan: 50, zero: true, series: [{ name: 'Rule-based', color: '--muted' }, { name: 'MPC', color: '--ai' }] });
-    const cP = new CL.Chart(pl, { title: 'Control actions (MPC)', yUnit: 'kW', height: 160, xFmt: xf, minSpan: 4, zero: true, series: [{ name: 'Battery charge(+)/discharge(−)', color: '--ctl' }, { name: 'Car charging', color: '--ctl', dash: [4, 3] }] });
-    const charts = [cA, cG, cB, cE, cC, cP];
+    const mc = CL.card(S.right, 'Controller');
+    const mode = CL.seg(mc, { options: [['onoff', 'On–Off'], ['pid', 'PID']], value: 'pid' });
+    const kp = CL.slider(mc, { label: 'Kp  (present)', min: 0, max: 80, step: 1, value: 15, unit: '%/°C', color: '--sys' });
+    const ki = CL.slider(mc, { label: 'Ki  (past)', min: 0, max: 5, step: .05, value: 0, dec: 2, unit: '%/(°C·s)', color: '--ai' });
+    const kd = CL.slider(mc, { label: 'Kd  (future)', min: 0, max: 80, step: 1, value: 0, unit: '%·s/°C', color: '--ok' });
+    const hyst = CL.slider(mc, { label: 'On–Off band', min: 0.2, max: 4, step: .1, value: 1, dec: 1, unit: '°C' });
+    const aw = CL.check(mc, 'Anti-windup (stop integrating when the heater is maxed out)', true);
+    const pr = el('div', { class: 'btns' }); mc.append(el('div', { class: 'muted', style: 'font-size:.8rem;margin:2px 0 4px' }, 'Presets'), pr);
+    const preset = (m, p, i, d) => () => { mode.set(m); kp.set(p); ki.set(i); kd.set(d); };
+    CL.button(pr, 'On–Off', preset('onoff', 15, 0, 0)); CL.button(pr, 'P only', preset('pid', 15, 0, 0)); CL.button(pr, 'PI', preset('pid', 15, .47, 0));
+    CL.button(pr, 'PID', preset('pid', 20, .6, 30)); CL.button(pr, 'Too aggressive', preset('pid', 60, 4, 0), 'warn');
 
-    const tc = CL.card(S.right, 'Score after 48 hours');
-    const Tt = CL.tiles(tc, [['cr', 'Bill: rules', '--muted'], ['cm', 'Bill: MPC', '--ai'], ['sv', 'Saving', '--ok'], ['ov', 'Overload h (R/M)', '--err'], ['pk', 'Peak kW (R/M)', '--sys'], ['ev', 'Car ready? (R/M)', '--ok']]);
-    const mc = CL.card(S.right, 'MPC settings');
-    const N = CL.slider(mc, { label: 'Prediction horizon N', min: 1, max: 24, step: 1, value: 12, unit: 'h', color: '--ai', hint: 'N = 1 is short-sighted. Longer horizons see tonight\'s peak price coming.' });
-    const fe = CL.slider(mc, { label: 'Solar forecast error', min: 0, max: 60, step: 5, value: 15, unit: '%', color: '--err' });
-    const wear = CL.slider(mc, { label: 'Battery wear cost', min: 0, max: 4, step: .25, value: 1, dec: 2, unit: '₹/kWh cycled', color: '--ctl' });
-    const sc = CL.card(S.right, 'Scenario');
-    const evNeed = CL.slider(sc, { label: 'Car needs (plugged in 6 pm, leaves 7 am)', min: 0, max: 40, step: 2, value: 30, unit: 'kWh', color: '--ok' });
-    const glim = CL.slider(sc, { label: 'Grid connection limit', min: 4, max: 12, step: .5, value: 7, dec: 1, unit: 'kW', color: '--err' });
-    const cloud = CL.slider(sc, { label: 'Day 2 cloud cover', min: 0, max: 90, step: 10, value: 60, unit: '%', color: '--err' });
-    const soc0 = CL.slider(sc, { label: 'Battery at start', min: 1, max: 10, step: .5, value: 5, dec: 1, unit: 'kWh', color: '--sys' });
-    [N, fe, wear, evNeed, glim, cloud, soc0].forEach(s => s.input.addEventListener('change', recompute));
+    const pc = CL.card(S.right, 'The water bath');
+    const sp = CL.slider(pc, { label: 'Setpoint', min: 10, max: 70, step: 1, value: 50, unit: '°C', color: '--ok', onInput: v => { if (st) { st.spT = st.t; st.spV = v; st.peak = -1e9; st.settle = null; st.iae = 0; st.energy = 0; st.start = st.T; } } });
+    const amb = CL.slider(pc, { label: 'Room (ambient) temperature', min: 5, max: 40, step: 1, value: 25, unit: '°C', color: '--err' });
+    const delay = CL.slider(pc, { label: 'Sensor/transport delay', min: 0, max: 15, step: .5, value: 4, dec: 1, unit: 's', color: '--err' });
+    const noise = CL.slider(pc, { label: 'Sensor noise', min: 0, max: 1.5, step: .05, value: .15, dec: 2, unit: '°C', color: '--err' });
+    const bt = el('div', { class: 'btns' }); pc.append(bt);
+    CL.button(bt, '🧊 Pour in cold water', () => { st.T -= 12; }, 'warn');
+    const win = CL.check(pc, 'Window open (extra heat loss)', false);
+
     const ex = CL.card(S.right, 'What you are seeing', 'explain'); const exT = el('div'); ex.append(exT);
     CL.guide(S.right, [
-      { title: 'The rule-based controller', text: 'Grey lines follow simple rules: charge the car at full power as soon as it is plugged in; charge the battery from surplus solar; discharge it whenever the house needs power. Sensible, but blind to the future.' },
-      { title: 'MPC looks ahead', text: 'Purple lines come from MPC. Scrub to the afternoon of day 1: the dotted purple line is the <b>plan</b> MPC made at that hour. It saves battery energy for the expensive 5–10 pm peak and charges the car after 10 pm, when power is cheap.', setup: () => { setHour(15); } },
-      { title: 'Receding horizon', text: 'Press play and watch the dotted plan: it is recomputed <i>every hour</i> with new measurements. The plan is never executed in full — only its first step. That is what makes MPC a feedback controller.' },
-      { title: 'Constraints are first-class citizens', text: 'Reduce the grid limit to 5 kW. Charging the car at full power on top of the evening load overloads the connection (red hours). MPC spreads the charging out because the limit is part of its optimisation problem.', setup: () => { glim.set(5); recompute(); } },
-      { title: 'Short-sighted vs far-sighted', text: 'Set the horizon to 1 h, then 6 h, then 24 h. Watch the saving grow. With a short horizon MPC cannot “see” the evening peak or the departure deadline.', setup: () => { N.set(1); recompute(); } },
-      { title: 'Bad forecasts', text: 'Increase the forecast error to 60 %. MPC is only as good as its predictions, but because it re-plans every hour it still corrects many mistakes. This is the price and power of model-based control.', setup: () => { N.set(12); fe.set(60); recompute(); } },
+      { title: 'The thermostat way', text: 'A household thermostat is <b>on–off</b>: full power below the band, off above. Watch the temperature zig-zag. The delay makes it overshoot the band every time.', setup: () => { preset('onoff', 15, 0, 0)(); reset(); } },
+      { title: 'Proportional: push harder when farther away', text: 'Switch to <b>P only</b>. The response is smooth but settles <i>below</i> 50 °C. Heat leaks out all the time, and P only produces power when there is an error, so some error must remain.', setup: () => { preset('pid', 15, 0, 0)(); reset(); } },
+      { title: 'Integral: remember the past', text: 'Choose <b>PI</b>. The purple I-term slowly grows while the error persists, until the error is gone. Look at the effort plot: at steady state the I-term supplies almost all the power.', setup: () => { preset('pid', 15, .47, 0)(); reset(); } },
+      { title: 'Disturbance rejection', text: 'Press <b>Pour in cold water</b> and open the window. Watch the I-term increase to compensate for the new heat loss. The setpoint is recovered without anyone retuning anything.' },
+      { title: 'Derivative: anticipate', text: 'Choose <b>PID</b> and change the setpoint. The green D-term opposes fast changes and acts like a brake as you approach the target. Now raise the sensor noise and see why engineers filter or limit D.', setup: () => { preset('pid', 20, .6, 30)(); } },
+      { title: 'Windup', text: 'Choose PI, untick <b>anti-windup</b>, set the setpoint to 10 °C, wait, then set it to 60 °C. While the cooler or heater is saturated, the integral keeps growing, so the temperature overshoots badly. Tick anti-windup and repeat.', setup: () => { preset('pid', 15, .47, 0)(); aw.set(false); } },
+      { title: 'Too aggressive = unstable', text: 'Choose <b>Too aggressive</b>, then increase the delay. The loop starts to oscillate and never settles. High gain plus delay erodes stability: this is why tuning is a science.', setup: () => { preset('pid', 60, 4, 0)(); delay.set(6); } },
     ]);
-    S.resetB.onclick = () => { N.set(12); fe.set(15); wear.set(1); evNeed.set(30); glim.set(7); cloud.set(60); soc0.set(5); recompute(); setHour(0); };
+    S.resetB.onclick = reset; reset();
 
-    let R = null, hour = 0;
-    function profiles() {
-      seed = 11; const pv = [], pvF = [], ld = [];
-      const cl = cloud.get() / 100;
-      for (let h = 0; h < HRS + 24; h++) {
-        const day2 = h >= 24 && h < 48; const c = day2 ? (1 - cl * (0.7 + 0.3 * rnd())) : (0.92 + 0.08 * rnd());
-        pv.push(pvClear(h) * c); ld.push(loadP(h) * (0.9 + 0.2 * rnd()));
+    const dt = 0.05;
+    function step() {
+      const Ta = amb.get() - (win.get() ? 15 : 0), loss = win.get() ? 1.6 : 1;
+      const yTrue = st.T, y = yTrue + noise.get() * randn();
+      const e = sp.get() - y;
+      let u;
+      if (mode.get() === 'onoff') {
+        if (e > hyst.get() / 2) st.onoff = 1; else if (e < -hyst.get() / 2) st.onoff = sp.get() < Ta ? -1 : 0;
+        if (sp.get() < Ta - 1 && e < -hyst.get() / 2) st.onoff = -1;
+        u = st.onoff; st.up = u; st.ui = 0; st.ud = 0;
+      } else {
+        const dy = (y - st.prevY) / dt; st.prevY = y; st.dF += (-dy - st.dF) * dt / 1.0; // filtered derivative on measurement
+        st.up = kp.get() / 100 * e; st.ud = kd.get() / 100 * st.dF;
+        const Inew = st.I + e * dt; let ui = ki.get() / 100 * Inew;
+        u = st.up + ui + st.ud; const us = clamp(u, -1, 1);
+        if (!aw.get() || us === u || Math.sign(e) !== Math.sign(u)) st.I = Inew;
+        st.ui = ki.get() / 100 * st.I; u = us;
       }
-      const fseeds = []; for (let k = 0; k < HRS; k++) { const row = []; for (let j = 0; j < 24; j++) row.push((rnd() * 2 - 1)); fseeds.push(row); }
-      return { pv, ld, fseeds };
+      st.u = clamp(u, -1, 1);
+      st.buf.push(st.u); const nd = Math.round(delay.get() / dt); while (st.buf.length > nd + 1) st.buf.shift();
+      const ud = st.buf.length > nd ? st.buf[0] : 0;
+      st.T += dt * (K * ud - loss * (st.T - Ta)) / TAU;
+      st.t += dt; st.y = y;
+      // metrics
+      const dir = Math.sign(st.spV - (st.start ?? st.T)) || 1;
+      st.peak = Math.max(st.peak, dir * (st.T - st.spV));
+      if (Math.abs(st.T - st.spV) > 0.5) st.settle = null; else if (st.settle == null) st.settle = st.t - st.spT;
+      st.iae += Math.abs(e) * dt; st.energy += Math.abs(ud) * 2 * dt / 3600; // 2 kW heater → kWh
     }
-    function stageGrid(load, pv, dB, ev) { return load + ev + (dB > 0 ? dB / ETA : dB * ETA) - pv; }
-    function stageCost(h, g, dB) { const lim = glim.get(); let c = g >= 0 ? g * price(h) : g * EXP; if (g > lim) c += (g - lim) * 200; return c + Math.abs(dB) * wear.get(); }
-    function solveDP(k, b0, e0, P) { // returns first action and plan
-      const n = Math.min(N.get(), HRS - k); const need = evNeed.get(), NE = Math.round(need / EVSTEP) + 1;
-      const err = fe.get() / 100;
-      const pvF = j => Math.max(0, P.pv[k + j] * (j === 0 ? 1 : (1 + err * P.fseeds[k][j])));
-      const ldF = j => j === 0 ? P.ld[k] : loadP(k + j);
-      let V = new Float64Array(NB * NE);
-      for (let b = 0; b < NB; b++) for (let e = 0; e < NE; e++) {
-        let c = -b * BSTEP * 6.5; // terminal value of stored energy
-        const hEnd = k + n, rem = need - e * EVSTEP;
-        if (hEnd <= DEPART && hEnd > PLUG) { const left = DEPART - hEnd; if (rem > left * EVP[EVP.length - 1] + 1e-9) c += 1e5; else c += rem * 5; }
-        else if (hEnd > DEPART && rem > 1e-9 && k < DEPART) c += 1e5;
-        V[b * NE + e] = c;
-      }
-      const pol = [];
-      for (let j = n - 1; j >= 0; j--) {
-        const h = k + j, Vn = new Float64Array(NB * NE).fill(Infinity), A = new Int16Array(NB * NE * 2);
-        const plugged = h >= PLUG && h < DEPART, pv = pvF(j), ld = ldF(j);
-        for (let b = 0; b < NB; b++) for (let e = 0; e < NE; e++) {
-          let best = Infinity, ba = 0, bev = 0;
-          for (let db = -6; db <= 6; db++) { const b2 = b + db; if (b2 < 0 || b2 >= NB) continue; const dB = db * BSTEP;
-            for (let a = 0; a < (plugged ? EVP.length : 1); a++) { const e2 = Math.min(NE - 1, e + EVP[a] / EVSTEP); const evE = (e2 - e) * EVSTEP;
-              const g = stageGrid(ld, pv, dB, evE); const c = stageCost(h, g, dB) + V[b2 * NE + e2];
-              if (c < best) { best = c; ba = db; bev = e2 - e; } } }
-          Vn[b * NE + e] = best; A[(b * NE + e) * 2] = ba; A[(b * NE + e) * 2 + 1] = bev;
-        }
-        pol[j] = A; V = Vn;
-      }
-      // roll out plan
-      let b = b0, e = e0; const plan = [b * BSTEP];
-      let first = null;
-      for (let j = 0; j < n; j++) { const i = (b * NE + e) * 2; const db = pol[j][i], de = pol[j][i + 1]; if (j === 0) first = [db, de]; b += db; e += de; plan.push(b * BSTEP); }
-      return { first, plan };
-    }
-    function recompute() {
-      const P = profiles(); const need = evNeed.get(); const NE = Math.round(need / EVSTEP) + 1; const lim = glim.get();
-      const out = { rule: { g: [], b: [], e: [], c: [], ov: 0, pk: 0 }, mpc: { g: [], b: [], e: [], c: [], ov: 0, pk: 0, db: [], ev: [], plans: [] }, P };
-      // rule-based
-      let b = soc0.get(), e = 0, cost = 0;
-      for (let h = 0; h < HRS; h++) {
-        const plugged = h >= PLUG && h < DEPART; const ev = plugged ? Math.min(7.2, need - e) : 0; e += ev;
-        const net = P.ld[h] + ev - P.pv[h]; let dB = 0;
-        if (net < 0) dB = Math.min(-net * ETA, 3.3, BCAP * .95 - b); else dB = -Math.min(net / ETA, 3.3, b - BCAP * .1);
-        dB = Math.max(dB, -b); b += dB;
-        const g = stageGrid(P.ld[h], P.pv[h], dB, ev); cost += (g >= 0 ? g * price(h) : g * EXP) + Math.abs(dB) * wear.get();
-        if (g > lim + 1e-6) out.rule.ov++; out.rule.pk = Math.max(out.rule.pk, g);
-        out.rule.g.push(g); out.rule.b.push(b); out.rule.e.push(e); out.rule.c.push(cost);
-      }
-      out.rule.ready = e >= need - 1e-6;
-      // MPC
-      let bi = Math.round(soc0.get() / BSTEP), ei = 0; cost = 0;
-      for (let h = 0; h < HRS; h++) {
-        const { first, plan } = solveDP(h, bi, ei, P);
-        const dB = first[0] * BSTEP, ev = first[1] * EVSTEP; bi += first[0]; ei = Math.min(NE - 1, ei + first[1]);
-        const g = stageGrid(P.ld[h], P.pv[h], dB, ev); cost += (g >= 0 ? g * price(h) : g * EXP) + Math.abs(dB) * wear.get();
-        if (g > lim + 1e-6) out.mpc.ov++; out.mpc.pk = Math.max(out.mpc.pk, g);
-        out.mpc.g.push(g); out.mpc.b.push(bi * BSTEP); out.mpc.e.push(ei * EVSTEP); out.mpc.c.push(cost); out.mpc.db.push(dB); out.mpc.ev.push(ev); out.mpc.plans.push(plan);
-      }
-      out.mpc.ready = ei * EVSTEP >= need - 1e-6;
-      R = out; render();
-    }
-    function render() {
-      if (!R) return; const xs = [...Array(HRS).keys()].map(i => i + 0.5), xs1 = xs.map(x => x + 0.5);
-      const P = R.P, err = fe.get() / 100;
-      const pvF = xs.map((_, h) => h < hour ? null : Math.max(0, P.pv[h] * (h === hour ? 1 : 1 + err * P.fseeds[hour][Math.min(23, h - hour)])));
-      cA.setData(xs, [P.pv.slice(0, HRS), pvF.map((v, h) => h - hour < N.get() ? v : null), P.ld.slice(0, HRS), xs.map((_, h) => price(h))]);
-      cG.setData(xs, [R.rule.g, R.mpc.g]); cG.extra = [{ y: glim.get(), color: '--err', label: 'grid limit' }];
-      const plan = R.mpc.plans[hour], pl = xs1.map((_, h) => h >= hour && h - hour < plan.length - 1 ? plan[h - hour + 1] : null);
-      cB.setData(xs1, [R.rule.b, R.mpc.b, pl]);
-      cE.setData(xs1, [R.rule.e, R.mpc.e, xs1.map(x => x <= DEPART + .5 && x >= PLUG ? evNeed.get() : null)]);
-      cC.setData(xs1, [R.rule.c, R.mpc.c]); cP.setData(xs, [R.mpc.db, R.mpc.ev]);
-      charts.forEach(c => { c.vline = hour + 0.5; c.draw([0, HRS]); });
-      const cr = R.rule.c[HRS - 1], cm = R.mpc.c[HRS - 1];
-      Tt.set('cr', '₹' + cr.toFixed(0)); Tt.set('cm', '₹' + cm.toFixed(0)); Tt.set('sv', (cr > 0 ? ((cr - cm) / cr * 100).toFixed(0) + ' %' : '₹' + (cr - cm).toFixed(0)));
-      Tt.set('ov', R.rule.ov + ' / ' + R.mpc.ov); Tt.set('pk', R.rule.pk.toFixed(1) + ' / ' + R.mpc.pk.toFixed(1)); Tt.set('ev', (R.rule.ready ? '✓' : '✗') + ' / ' + (R.mpc.ready ? '✓' : '✗'));
-      const d = Math.floor(hour / 24) + 1; hourL.textContent = `Day ${d}, ${String(hour % 24).padStart(2, '0')}:00–${String((hour % 24) + 1).padStart(2, '0')}:00 · ₹${price(hour)}/kWh`;
-      const m = [];
-      const hh = hour % 24;
-      if (hh >= 17 && hh < 22) m.push('Peak price hours. MPC drains the battery it saved earlier; the rule-based battery may already be empty.');
-      if (hour >= PLUG && hour < DEPART) m.push(R.mpc.ev[hour] > 0 ? `MPC is charging the car at ${R.mpc.ev[hour]} kW now${price(hour) <= 5 ? ' — cheap night power' : ''}.` : 'The car is plugged in, but MPC waits: its plan finishes charging later, at lower prices, still before 7 am.');
-      if (R.rule.g[hour] > glim.get()) m.push(`<span style="color:var(--err)">The rule-based home is drawing ${R.rule.g[hour].toFixed(1)} kW, above the ${glim.get()} kW limit.</span>`);
-      if (N.get() < 4) m.push('With such a short horizon, MPC behaves almost like a greedy rule: it cannot anticipate.');
-      m.push(`<span class="muted">Profiles are illustrative (5 kWp solar, 10 kWh battery, 6–7 kW charger, ₹5 / 7.5 / 11 time-of-use tariff, ₹3 export). MPC is solved exactly by dynamic programming on a grid.</span>`);
-      exT.innerHTML = m.map(s => `<p>${s}</p>`).join('');
-    }
-    function setHour(h) { hour = clamp(h, 0, HRS - 1); hourS.value = hour; render(); }
-    hourS.oninput = () => { playing = false; playB.textContent = '▶ Play'; setHour(+hourS.value); };
-    recompute();
-    let acc = 0, ph = 0;
+    let acc = 0, pushT = -1;
     const L = CL.loop((rdt, paused) => {
-      if (playing && !paused) { acc += rdt; if (acc > 0.7) { acc = 0; setHour((hour + 1) % HRS); } }
-      ph += rdt; draw();
+      if (!paused) { acc += rdt * SPEED; while (acc >= dt) { step(); acc -= dt; } }
+      if (st.t - pushT >= 0.25) {
+        pushT = st.t; cT.push(st.t, [sp.get(), st.y ?? st.T, st.T]);
+        cU.push(st.t, mode.get() === 'onoff' ? [st.u * 100, null, null, null] : [st.u * 100, st.up * 100, st.ui * 100, st.ud * 100]);
+      }
+      cT.extra = mode.get() === 'onoff' ? [{ y: sp.get() + hyst.get() / 2, color: '--muted', label: '' }, { y: sp.get() - hyst.get() / 2, color: '--muted', label: 'band' }] : [];
+      charts.forEach(c => c.draw()); draw(); explain();
     }, S.pauseB);
 
+    let parts = [];
     function draw() {
-      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h); if (!R) return;
-      const P = R.P, k = hour, hh = k % 24;
-      const night = hh < 6 || hh >= 19; const sky = ctx.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, night ? 'rgba(20,30,70,.5)' : CL.alpha(css('--sys'), .25)); sky.addColorStop(1, 'transparent'); ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
-      const half = w / 2;
-      const panel = (x0, title, g, dB, ev, col) => {
-        ctx.fillStyle = col; ctx.font = '700 15px "Space Grotesk",Inter'; ctx.textAlign = 'center'; ctx.fillText(title, x0 + half / 2, 22);
-        const cx = x0 + half / 2, cy = h * 0.56, s = Math.min(half / 360, h / 230);
-        // house
-        ctx.fillStyle = css('--panel'); ctx.strokeStyle = css('--muted'); ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(cx - 55 * s, cy - 10 * s); ctx.lineTo(cx, cy - 55 * s); ctx.lineTo(cx + 55 * s, cy - 10 * s); ctx.lineTo(cx + 45 * s, cy - 10 * s); ctx.lineTo(cx + 45 * s, cy + 45 * s); ctx.lineTo(cx - 45 * s, cy + 45 * s); ctx.lineTo(cx - 45 * s, cy - 10 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = css('--sys'); ctx.font = `600 ${11 * s + 2}px Inter`; ctx.fillText(`home ${P.ld[k].toFixed(1)} kW`, cx, cy + 20 * s);
-        const node = (x, y, lab, val, c) => { ctx.fillStyle = css(c); ctx.beginPath(); ctx.arc(x, y, 20 * s, 0, 7); ctx.globalAlpha = .2; ctx.fill(); ctx.globalAlpha = 1; ctx.font = `600 ${10 * s + 2}px Inter`; ctx.fillText(lab, x, y - 25 * s); ctx.font = `700 ${11 * s + 3}px "Space Grotesk"`; ctx.fillText(val, x, y + 5 * s); };
-        const flow = (x0, y0, x1, y1, p, c) => { if (Math.abs(p) < 0.05) { ctx.strokeStyle = css('--grid'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); return; }
-          const [a, b2, c2, d] = p > 0 ? [x0, y0, x1, y1] : [x1, y1, x0, y0]; ctx.strokeStyle = css(c); ctx.lineWidth = 2 + Math.abs(p) * 1.2; ctx.setLineDash([8, 8]); ctx.lineDashOffset = -ph * 40; ctx.beginPath(); ctx.moveTo(a, b2); ctx.lineTo(c2, d); ctx.stroke(); ctx.setLineDash([]); };
-        const sunX = cx - 120 * s, sunY = cy - 50 * s, gX = cx + 130 * s, gY = cy - 40 * s, bX = cx - 120 * s, bY = cy + 55 * s, eX = cx + 130 * s, eY = cy + 55 * s;
-        flow(sunX, sunY, cx - 45 * s, cy - 5 * s, P.pv[k], '--warn'); node(sunX, sunY, 'solar', P.pv[k].toFixed(1), '--warn');
-        flow(gX, gY, cx + 45 * s, cy - 5 * s, g, g > glim.get() ? '--err' : '--sys'); node(gX, gY, 'grid ₹' + price(k), (g >= 0 ? '+' : '') + g.toFixed(1), g > glim.get() ? '--err' : '--sys');
-        flow(cx - 45 * s, cy + 35 * s, bX, bY, dB, '--ctl'); node(bX, bY, 'battery', (dB >= 0 ? '+' : '') + dB.toFixed(1), '--ctl');
-        flow(cx + 45 * s, cy + 35 * s, eX, eY, ev, '--ctl'); node(eX, eY, k >= PLUG && k < DEPART ? 'car 🔌' : 'car (away)', ev.toFixed(1), '--ctl');
-      };
-      panel(0, 'Rule-based', R.rule.g[k], R.rule.b[k] - (k ? R.rule.b[k - 1] : soc0.get()), k >= PLUG && k < DEPART ? R.rule.e[k] - (k ? R.rule.e[k - 1] : 0) : 0, css('--muted'));
-      panel(half, 'Model Predictive Control', R.mpc.g[k], R.mpc.db[k], R.mpc.ev[k], css('--ai'));
-      ctx.strokeStyle = css('--line'); ctx.beginPath(); ctx.moveTo(half, 30); ctx.lineTo(half, h - 10); ctx.stroke();
-      ctx.font = '600 13px Inter'; ctx.textAlign = 'left'; ctx.fillStyle = css('--muted'); ctx.fillText(`Day ${Math.floor(k / 24) + 1}  ${String(hh).padStart(2, '0')}:00   (kW)`, 10, h - 10);
+      const { ctx, w, h } = cv; ctx.clearRect(0, 0, w, h);
+      const tx = w * 0.18, tw = Math.min(w * 0.38, 330), ty = h * 0.18, th = h * 0.68;
+      const f = clamp((st.T - 5) / 70, 0, 1);
+      const water = `rgb(${Math.round(59 + 180 * f)},${Math.round(130 - 62 * f)},${Math.round(246 - 178 * f)})`;
+      // tank
+      ctx.lineWidth = 4; ctx.strokeStyle = css('--muted');
+      ctx.fillStyle = water; ctx.globalAlpha = .85; ctx.fillRect(tx, ty + th * .12, tw, th * .88); ctx.globalAlpha = 1;
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx, ty + th); ctx.lineTo(tx + tw, ty + th); ctx.lineTo(tx + tw, ty); ctx.stroke();
+      // heater coil
+      const ud = st.buf.length ? st.buf[0] : 0; const hc = ud >= 0 ? `rgba(255,${160 - 100 * ud},40,${0.25 + 0.75 * ud})` : `rgba(80,170,255,${0.25 - 0.75 * ud})`;
+      ctx.strokeStyle = hc; ctx.lineWidth = 6; ctx.beginPath();
+      for (let i = 0; i <= 40; i++) { const x = tx + 20 + i * (tw - 40) / 40, y = ty + th - 22 + Math.sin(i * 1.2) * 9; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+      ctx.fillStyle = css('--ctl'); ctx.font = '600 13px Inter'; ctx.textAlign = 'center';
+      ctx.fillText(ud > 0.02 ? `heating ${(ud * 100).toFixed(0)} %` : ud < -0.02 ? `cooling ${(-ud * 100).toFixed(0)} %` : 'actuator idle', tx + tw / 2, ty + th + 22);
+      if (st.buf.length > 1 && Math.abs(st.u - ud) > .05) { ctx.fillStyle = css('--muted'); ctx.fillText(`(commanded ${(st.u * 100).toFixed(0)} % — still on its way: delay)`, tx + tw / 2, ty + th + 40); }
+      // steam / ice particles
+      if (Math.random() < f * 0.6) parts.push({ x: tx + Math.random() * tw, y: ty + th * .12, v: 20 + Math.random() * 30, life: 1 });
+      parts = parts.filter(p => (p.life -= 0.015) > 0);
+      parts.forEach(p => { p.y -= p.v * 0.016; ctx.fillStyle = `rgba(220,220,230,${p.life * .5})`; ctx.beginPath(); ctx.arc(p.x + Math.sin(p.y / 9) * 4, p.y, 5 + (1 - p.life) * 9, 0, 7); ctx.fill(); });
+      // sensor
+      ctx.fillStyle = css('--sys'); ctx.fillRect(tx + tw - 26, ty - 10, 8, th * .6);
+      ctx.font = '600 12px Inter'; ctx.textAlign = 'right'; ctx.fillText('sensor', tx + tw - 30, ty + 4);
+      // thermometer gauge
+      const gx = tx + tw + 70, gy = ty, gh = th; ctx.fillStyle = css('--panel'); CL.rrect(ctx, gx - 12, gy, 24, gh, 12); ctx.fill(); ctx.strokeStyle = css('--line'); ctx.lineWidth = 2; ctx.stroke();
+      const Y = v => gy + gh - (clamp(v, 0, 80) / 80) * gh;
+      ctx.fillStyle = water; CL.rrect(ctx, gx - 8, Y(st.T), 16, gy + gh - Y(st.T) - 2, 8); ctx.fill();
+      ctx.strokeStyle = css('--ok'); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(gx - 24, Y(sp.get())); ctx.lineTo(gx + 24, Y(sp.get())); ctx.stroke();
+      ctx.fillStyle = css('--muted'); ctx.textAlign = 'left'; ctx.font = '11px Inter';
+      for (let v = 0; v <= 80; v += 20) ctx.fillText(v + '°', gx + 18, Y(v) + 4);
+      ctx.fillStyle = css('--ok'); ctx.font = '600 12px Inter'; ctx.fillText('target ' + sp.get() + '°', gx + 30, Y(sp.get()) + 4);
+      ctx.textAlign = 'left'; ctx.font = '700 30px "Space Grotesk",Inter'; ctx.fillStyle = css('--ink'); ctx.fillText(st.T.toFixed(1) + ' °C', 16, 40);
+      ctx.font = '13px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText(`room ${amb.get() - (win.get() ? 15 : 0)} °C${win.get() ? ' (window open)' : ''} • time ×${SPEED}`, 16, 62);
+      // block diagram text on right
+      if (w > 760) {
+        const bx = gx + 120; ctx.font = '600 13px Inter'; ctx.fillStyle = css('--muted'); ctx.fillText('Error now', bx, ty + 10);
+        const e = sp.get() - st.T; ctx.font = '700 22px "Space Grotesk"'; ctx.fillStyle = css('--err'); ctx.fillText((e >= 0 ? '+' : '') + e.toFixed(2) + ' °C', bx, ty + 36);
+        const bar = (lab, v, c, yy) => { ctx.fillStyle = css('--muted'); ctx.font = '12px Inter'; ctx.fillText(lab, bx, yy); const bw = 150; ctx.fillStyle = css('--grid'); ctx.fillRect(bx + 30, yy - 10, bw, 12); ctx.fillStyle = css(c); const vv = clamp(v, -1.5, 1.5) / 1.5 * bw / 2; ctx.fillRect(bx + 30 + bw / 2 + Math.min(0, vv), yy - 10, Math.abs(vv), 12); };
+        if (mode.get() === 'pid') { bar('P', st.up, '--sys', ty + 70); bar('I', st.ui, '--ai', ty + 92); bar('D', st.ud, '--ok', ty + 114); bar('Σ', st.u, '--ctl', ty + 140); }
+      }
+    }
+    let lastEx = 0;
+    function explain() {
+      if (performance.now() - lastEx < 400) return; lastEx = performance.now();
+      const e = sp.get() - st.T, el2 = st.t - st.spT;
+      T.set('os', st.peak > 0.05 ? st.peak.toFixed(1) + ' °C' : '0'); T.set('ts', st.settle != null ? st.settle.toFixed(0) + ' s' : '…');
+      T.set('ss', e.toFixed(2) + ' °C'); T.set('en', (st.energy * 1000).toFixed(0) + ' Wh');
+      const m = [];
+      if (mode.get() === 'onoff') m.push('On–off control only knows “too cold” or “too hot”. Because of the delay, the heater keeps going after the target is reached, so the temperature cycles around the band. Cheap and robust, but never precise.');
+      else {
+        const pOnly = ki.get() === 0;
+        if (pOnly && Math.abs(e) > 0.4 && el2 > 120) m.push(`<b>Steady-state error</b> of ${e.toFixed(1)} °C. The P-term gives ${(st.up * 100).toFixed(0)} % power only because the error exists. Remove the error and the power disappears too.`);
+        if (!pOnly && Math.abs(e) < 0.4 && el2 > 60) m.push(`On target. The <span style="color:var(--ai)">I-term</span> now supplies ${(st.ui * 100).toFixed(0)} % power: it has “learned” how much power the heat leak needs.`);
+        if (Math.abs(st.u) > 0.995) m.push('<span style="color:var(--err)">The actuator is saturated. While it stays saturated, the controller has no control authority left.</span>' + (!aw.get() && ki.get() > 0 ? ' The integral keeps winding up, so expect a big overshoot later.' : ''));
+        if (kd.get() > 0 && noise.get() > 0.5) m.push('The D-term amplifies sensor noise; that is why its effort line is jittery. Real controllers filter the derivative.');
+        if (kp.get() > 45 && ki.get() > 2) m.push('Gains this high, with a delay, give persistent oscillation: the controller keeps reacting to old information.');
+      }
+      if (!m.length) m.push('Change the setpoint or press “Pour in cold water” and watch how each term reacts.');
+      exT.innerHTML = m.map(s => `<p>${s}</p>`).join('');
     }
     return { stop: L.stop };
   }
 };
 
-CL.initTheme(); APPS['energy'].mount(document.getElementById('root'), false);</script>
+CL.initTheme(); APPS['thermo'].mount(document.getElementById('root'), false);</script>
 <script>/* link back to the main website */
 (function () {
   var a = document.createElement('a');
